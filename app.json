@@ -1,16 +1,20 @@
 {
   "expo": {
-    "name": "gallery-wipe",
+    "name": "Gallery Wipe",
     "slug": "gallery-wipe",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "gallerywipe",
     "userInterfaceStyle": "automatic",
+    "platforms": ["ios", "android"],
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.prastavna.gallerywipe",
+      "supportsTablet": false
     },
     "android": {
+      "package": "com.prastavna.gallerywipe",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -18,10 +22,6 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "output": "server",
-      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -32,7 +32,17 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Gallery Wipe needs access to your photos and videos so you can review them and delete the ones you no longer want.",
+          "savePhotosPermission": "Gallery Wipe needs permission to modify your library so it can delete the items you choose.",
+          "granularPermissions": ["photo", "video"]
+        }
+      ],
+      "expo-video",
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,
