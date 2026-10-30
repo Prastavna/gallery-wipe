@@ -28,6 +28,8 @@ const REDUCED_FLY_OUT_MS = 120;
 const MAX_ROTATION_DEG = 12;
 const SPRING = { damping: 18, stiffness: 180 };
 
+const BACKDROP_BLUR = 40;
+
 // Wide enough for the longest mark, "Delete", with room to spare.
 const STAMP_WIDTH = 240;
 
@@ -211,11 +213,27 @@ export function SwipeCard({
           onAccessibilityAction={(event) => flyOut(event.nativeEvent.actionName as Decision)}
           onPress={() => onOpen(item)}
           onLongPress={() => setShowInfo((value) => !value)}>
+          {/* The whole frame matters for the decision, so the photo is never cropped; a blurred,
+              dimmed copy fills the space it leaves. */}
+          {image !== 'broken' && (
+            <>
+              <Image
+                source={{ uri: item.id }}
+                recyclingKey={`${item.id}-backdrop`}
+                cachePolicy="memory"
+                contentFit="cover"
+                blurRadius={BACKDROP_BLUR}
+                style={StyleSheet.absoluteFill}
+                accessible={false}
+              />
+              <View style={styles.backdropDim} pointerEvents="none" />
+            </>
+          )}
           <Image
             source={{ uri: item.id }}
             recyclingKey={item.id}
             cachePolicy="memory"
-            contentFit="cover"
+            contentFit="contain"
             transition={reduceMotion ? 0 : 120}
             onLoad={() => setImage('loaded')}
             onError={() => {
@@ -329,6 +347,10 @@ const styles = StyleSheet.create({
     borderRadius: Radius.large,
     borderCurve: 'continuous',
     overflow: 'hidden',
+  },
+  backdropDim: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   center: {
     ...StyleSheet.absoluteFill,

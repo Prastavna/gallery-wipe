@@ -106,7 +106,8 @@ export function VideoLayer({ uri, active, showSurface, cardPan }: VideoLayerProp
         <VideoView
           player={player}
           nativeControls={false}
-          contentFit="cover"
+          // Show the whole frame, as for photos; the card's blurred poster fills the rest.
+          contentFit="contain"
           // Cards rotate and slide; a SurfaceView would not follow those transforms on Android.
           surfaceType={Platform.OS === 'android' ? 'textureView' : undefined}
           onFirstFrameRender={() => setFirstFrame(true)}
