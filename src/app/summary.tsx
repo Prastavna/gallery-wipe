@@ -10,10 +10,12 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { getLifetime, type Lifetime } from '@/db/trash';
 import { haptic } from '@/features/preferences';
+import { useTheme } from '@/hooks/use-theme';
 import { formatBytes, numberFormat } from '@/utils/format';
 
 export default function SummaryScreen() {
   const db = useSQLiteContext();
+  const theme = useTheme();
   const params = useLocalSearchParams<{ deleted: string; bytes: string; remaining: string }>();
   const deleted = Number(params.deleted ?? 0);
   const bytes = Number(params.bytes ?? 0);
@@ -29,19 +31,25 @@ export default function SummaryScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.copy}>
-          <ThemedText type="small" themeColor="textSecondary">
-            {`Deleted ${numberFormat.format(deleted)} items`}
+          <ThemedText type="title" accessibilityRole="header">
+            {bytes > 0 ? formatBytes(bytes) : numberFormat.format(deleted)}
           </ThemedText>
-          <ThemedText type="title" style={styles.center}>
-            {bytes > 0 ? `${formatBytes(bytes)} freed` : 'Done'}
+          <ThemedText type="subtitle" themeColor="textSecondary">
+            {bytes > 0 ? 'freed' : deleted === 1 ? 'item deleted' : 'items deleted'}
           </ThemedText>
+          <View style={[styles.rule, { backgroundColor: theme.line }]} />
+          {bytes > 0 && (
+            <ThemedText themeColor="textSecondary">
+              {`${numberFormat.format(deleted)} ${deleted === 1 ? 'item' : 'items'} deleted.`}
+            </ThemedText>
+          )}
           {remaining > 0 && (
-            <ThemedText themeColor="textSecondary" style={styles.center}>
+            <ThemedText themeColor="textSecondary">
               {`${numberFormat.format(remaining)} items are still in Trash.`}
             </ThemedText>
           )}
           {lifetime && lifetime.bytes > bytes && (
-            <ThemedText themeColor="textSecondary" style={styles.center}>
+            <ThemedText themeColor="textSecondary">
               {`${formatBytes(lifetime.bytes)} freed with Gallery Wipe so far.`}
             </ThemedText>
           )}
@@ -60,13 +68,15 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: Spacing.four,
   },
+  // Left-aligned and low on the screen, like a total at the foot of a receipt.
   copy: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.two,
+    justifyContent: 'flex-end',
+    gap: Spacing.one,
+    paddingBottom: Spacing.five,
   },
-  center: {
-    textAlign: 'center',
+  rule: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: Spacing.three,
   },
 });

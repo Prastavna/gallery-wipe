@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useImperativeHandle, useState, type Ref } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   Extrapolation,
@@ -16,7 +16,7 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { FontFamily, Radius, Spacing } from '@/constants/theme';
 import type { Decision, DeckItem } from '@/db/decisions';
 import { VideoLayer } from '@/features/deck/video-layer';
 import { haptic } from '@/features/preferences';
@@ -27,6 +27,13 @@ const FLY_OUT_MS = 220;
 const REDUCED_FLY_OUT_MS = 120;
 const MAX_ROTATION_DEG = 12;
 const SPRING = { damping: 18, stiffness: 180 };
+
+// Grease pencil on a print: these sit on top of the photo, so they stay bright in either theme.
+const MARKER: Record<Decision, string> = {
+  keep: '#4BE39A',
+  trash: '#FF5A47',
+  skip: '#FFFFFF',
+};
 
 export type SwipeCardHandle = {
   swipe: (decision: Decision) => void;
@@ -236,7 +243,7 @@ export function SwipeCard({
             />
           )}
           <View style={styles.footer} pointerEvents="none">
-            <ThemedText type="smallBold" style={styles.onPhoto}>
+            <ThemedText type="heading" style={styles.onPhoto}>
               {[
                 formatDate(item.creationTime),
                 isVideo ? formatDuration(item.duration) : null,
@@ -255,18 +262,16 @@ export function SwipeCard({
           </View>
         </Pressable>
 
-        <Animated.View style={[styles.stamp, styles.stampLeft, { borderColor: theme.success }, keepStampStyle]}>
-          <ThemedText type="smallBold" style={{ color: theme.success }}>
-            KEEP
-          </ThemedText>
+        <Animated.View style={[styles.stamp, styles.stampLeft, keepStampStyle]} pointerEvents="none">
+          <Text style={[styles.mark, { color: MARKER.keep }]}>Keep</Text>
+          <View style={[styles.underline, { backgroundColor: MARKER.keep }]} />
         </Animated.View>
-        <Animated.View style={[styles.stamp, styles.stampRight, { borderColor: theme.danger }, trashStampStyle]}>
-          <ThemedText type="smallBold" style={{ color: theme.danger }}>
-            DELETE
-          </ThemedText>
+        <Animated.View style={[styles.stamp, styles.stampRight, trashStampStyle]} pointerEvents="none">
+          <Text style={[styles.mark, { color: MARKER.trash }]}>Delete</Text>
+          <View style={[styles.underline, { backgroundColor: MARKER.trash }]} />
         </Animated.View>
-        <Animated.View style={[styles.stamp, styles.stampBottom, { borderColor: theme.text }, skipStampStyle]}>
-          <ThemedText type="smallBold">LATER</ThemedText>
+        <Animated.View style={[styles.stamp, styles.stampBottom, skipStampStyle]} pointerEvents="none">
+          <Text style={[styles.mark, { color: MARKER.skip }]}>Later</Text>
         </Animated.View>
       </Animated.View>
     </GestureDetector>
@@ -292,7 +297,7 @@ function formatDuration(ms: number | null) {
 const styles = StyleSheet.create({
   card: {
     ...StyleSheet.absoluteFill,
-    borderRadius: Spacing.four,
+    borderRadius: Radius.large,
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
@@ -312,32 +317,50 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     gap: Spacing.half,
-    padding: Spacing.three,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.five,
+    paddingBottom: Spacing.three,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   onPhoto: {
     color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowRadius: 4,
   },
   stamp: {
     position: 'absolute',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    borderWidth: 3,
-    borderRadius: Spacing.two,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    alignItems: 'center',
+  },
+  mark: {
+    fontFamily: FontFamily.marker,
+    fontSize: 52,
+    lineHeight: 64,
+    paddingHorizontal: Spacing.two,
+    textShadowColor: 'rgba(0, 0, 0, 0.55)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+  // A quick stroke under the word, as an editor would scrawl it.
+  underline: {
+    height: 5,
+    width: '86%',
+    marginTop: -Spacing.two,
+    borderRadius: 3,
+    transform: [{ rotate: '-2deg' }],
   },
   stampLeft: {
-    top: Spacing.six,
+    top: Spacing.five,
     left: Spacing.four,
-    transform: [{ rotate: '-12deg' }],
+    transform: [{ rotate: '-14deg' }],
   },
   stampRight: {
-    top: Spacing.six,
+    top: Spacing.five,
     right: Spacing.four,
-    transform: [{ rotate: '12deg' }],
+    transform: [{ rotate: '11deg' }],
   },
   stampBottom: {
     bottom: Spacing.six + Spacing.four,
     alignSelf: 'center',
+    transform: [{ rotate: '-4deg' }],
   },
 });

@@ -130,6 +130,7 @@ export default function LibraryScreen() {
             <Button
               title={selecting ? 'Cancel' : 'Select'}
               variant="secondary"
+              size="compact"
               onPress={selecting ? endSelection : () => setSelecting(true)}
             />
           </View>
@@ -155,7 +156,7 @@ export default function LibraryScreen() {
           windowSize={7}
           ListEmptyComponent={
             <ThemedText themeColor="textSecondary" style={styles.empty}>
-              Nothing here.
+              {mediaType === 'video' ? 'No videos in your library.' : mediaType === 'image' ? 'No photos in your library.' : 'Your library is empty.'}
             </ThemedText>
           }
           renderItem={({ item }) => (
@@ -187,7 +188,7 @@ export default function LibraryScreen() {
             <ThemedText type="smallBold" style={styles.actionText}>
               {`${numberFormat.format(selected.size)} selected${selectedBytes ? ` · ${formatBytes(selectedBytes)}` : ''}`}
             </ThemedText>
-            <Button title={deleting ? 'Deleting…' : 'Delete'} variant="danger" disabled={deleting} onPress={onDelete} />
+            <Button title={deleting ? 'Deleting…' : 'Delete'} variant="danger" size="compact" disabled={deleting} onPress={onDelete} />
           </View>
         )}
       </SafeAreaView>

@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, Spacing } from '@/constants/theme';
+import { BottomTabInset, Radius, Spacing } from '@/constants/theme';
 import { clearDecisions, countDecisions, type Decision } from '@/db/decisions';
 import { getLifetime, type Lifetime } from '@/db/trash';
 import { requestScan, useIndexStatus } from '@/features/media/indexer';
@@ -65,6 +65,7 @@ export default function SettingsScreen() {
                 <Button
                   title="Reset"
                   variant="secondary"
+                  size="compact"
                   disabled={!counts?.keep}
                   onPress={() =>
                     confirmClear(
@@ -84,6 +85,7 @@ export default function SettingsScreen() {
                 <Button
                   title="Reset"
                   variant="secondary"
+                  size="compact"
                   disabled={!counts?.skip}
                   onPress={() =>
                     confirmClear('skip', 'Reset saved for later?', 'These items will count as not reviewed.', 'Reset')
@@ -98,6 +100,7 @@ export default function SettingsScreen() {
                 <Button
                   title="Empty"
                   variant="secondary"
+                  size="compact"
                   disabled={!counts?.trash}
                   onPress={() =>
                     confirmClear(
@@ -155,7 +158,7 @@ export default function SettingsScreen() {
                       ? `${numberFormat.format(lastScan.count)} items in ${seconds(lastScan.assetsMs)}, albums in ${seconds(lastScan.durationMs - lastScan.assetsMs)}`
                       : 'Not scanned yet'
               }
-              action={<Button title="Rescan" variant="secondary" disabled={scanning} onPress={() => requestScan(db)} />}
+              action={<Button title="Rescan" variant="secondary" size="compact" disabled={scanning} onPress={() => requestScan(db)} />}
             />
           </Section>
 
@@ -183,8 +186,8 @@ export default function SettingsScreen() {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View style={styles.section}>
-      <ThemedText type="smallBold" themeColor="textSecondary">
-        {title.toUpperCase()}
+      <ThemedText type="heading" accessibilityRole="header">
+        {title}
       </ThemedText>
       <ThemedView type="backgroundElement" style={styles.card}>
         {children}
@@ -197,7 +200,7 @@ function Row({ label, detail, action }: { label: string; detail?: string; action
   return (
     <View style={styles.row}>
       <View style={styles.flex}>
-        <ThemedText>{label}</ThemedText>
+        <ThemedText type="defaultBold">{label}</ThemedText>
         {detail ? (
           <ThemedText type="small" themeColor="textSecondary">
             {detail}
@@ -218,8 +221,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    gap: Spacing.four,
+    gap: Spacing.five,
     padding: Spacing.four,
+    paddingTop: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.four,
   },
   section: {
@@ -228,7 +232,8 @@ const styles = StyleSheet.create({
   card: {
     gap: Spacing.three,
     padding: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Radius.medium,
+    borderCurve: 'continuous',
   },
   row: {
     flexDirection: 'row',

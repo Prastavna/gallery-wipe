@@ -1,3 +1,10 @@
+import { Barlow_400Regular } from '@expo-google-fonts/barlow/400Regular';
+import { Barlow_500Medium } from '@expo-google-fonts/barlow/500Medium';
+import { Barlow_600SemiBold } from '@expo-google-fonts/barlow/600SemiBold';
+import { BarlowCondensed_600SemiBold } from '@expo-google-fonts/barlow-condensed/600SemiBold';
+import { BarlowCondensed_700Bold } from '@expo-google-fonts/barlow-condensed/700Bold';
+import { PermanentMarker_400Regular } from '@expo-google-fonts/permanent-marker/400Regular';
+import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
@@ -9,11 +16,20 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Button } from '@/components/button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, FontFamily, Spacing } from '@/constants/theme';
 import { migrateDbIfNeeded } from '@/db/migrations';
 import { hasLibraryAccess, useMediaPermission } from '@/features/media/permissions';
 
 SplashScreen.preventAutoHideAsync();
+
+const FONTS = {
+  [FontFamily.regular]: Barlow_400Regular,
+  [FontFamily.medium]: Barlow_500Medium,
+  [FontFamily.semiBold]: Barlow_600SemiBold,
+  [FontFamily.condensed]: BarlowCondensed_600SemiBold,
+  [FontFamily.condensedBold]: BarlowCondensed_700Bold,
+  [FontFamily.marker]: PermanentMarker_400Regular,
+};
 
 // Navigation chrome (screen and sheet backgrounds, borders) in the app's own palette.
 const NAVIGATION_THEMES = {
@@ -29,13 +45,16 @@ const NAVIGATION_THEMES = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  // On failure the system font stands in; better than a stuck splash screen.
+  const [fontsLoaded, fontError] = useFonts(FONTS);
+  const fontsReady = fontsLoaded || !!fontError;
 
   return (
     <GestureHandlerRootView style={styles.flex}>
       <ThemeProvider value={NAVIGATION_THEMES[colorScheme === 'dark' ? 'dark' : 'light']}>
         <StatusBar style="auto" />
         <SQLiteProvider databaseName="gallery-wipe.db" onInit={migrateDbIfNeeded}>
-          <RootStack />
+          {fontsReady && <RootStack />}
         </SQLiteProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
@@ -90,7 +109,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
       <View style={styles.errorContent}>
         <ThemedText type="subtitle">Something went wrong</ThemedText>
         <ThemedText themeColor="textSecondary">
-          Nothing was deleted. Your decisions so far are saved.
+          Nothing was deleted. Your decisions so far are saved. Try again, or close and reopen the app.
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           {error.message}

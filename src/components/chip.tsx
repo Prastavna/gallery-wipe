@@ -20,11 +20,14 @@ export function Chip({ label, selected, onPress }: ChipProps) {
       style={({ pressed }) => [
         styles.chip,
         {
-          backgroundColor: selected ? theme.text : theme.backgroundElement,
+          backgroundColor: selected ? theme.text : 'transparent',
+          borderColor: selected ? theme.text : theme.line,
           opacity: pressed ? 0.7 : 1,
         },
       ]}>
-      <ThemedText type="small" style={{ color: selected ? theme.background : theme.text }}>
+      <ThemedText
+        type={selected ? 'smallBold' : 'small'}
+        style={{ color: selected ? theme.background : theme.text }}>
         {label}
       </ThemedText>
     </Pressable>
@@ -56,7 +59,8 @@ export function ChipGroup<T>({ options, value, onChange }: ChipGroupProps<T>) {
 const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: Spacing.two - 1,
+    borderWidth: 1,
     borderRadius: Spacing.four,
   },
   group: {

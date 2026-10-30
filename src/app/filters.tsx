@@ -125,6 +125,7 @@ export default function FiltersScreen() {
           <Button
             title="Reset"
             variant="secondary"
+            size="compact"
             onPress={() => setDraft({ ...DEFAULT_FILTERS, sort: draft.sort })}
           />
         </View>
@@ -240,7 +241,7 @@ export default function FiltersScreen() {
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
     <View style={styles.section}>
-      <ThemedText type="smallBold">
+      <ThemedText type="defaultBold">
         {title}
         {hint ? <ThemedText type="small" themeColor="textSecondary">{`  ${hint}`}</ThemedText> : null}
       </ThemedText>

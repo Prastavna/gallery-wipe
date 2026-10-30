@@ -144,7 +144,7 @@ export default function GroupsScreen() {
               <ThemedText type="small" style={styles.flex}>
                 {`${numberFormat.format(moved)} items moved to Trash.`}
               </ThemedText>
-              <Button title="Review Trash" variant="secondary" onPress={() => router.push('/trash')} />
+              <Button title="Review Trash" variant="secondary" size="compact" onPress={() => router.push('/trash')} />
             </View>
           )}
         </View>
@@ -252,6 +252,7 @@ function GroupCard({ group, chosen, onToggle, onApply }: GroupCardProps) {
       <Button
         title={`Delete ${chosen.size}${bytes ? ` · ${formatBytes(bytes)}` : ''}`}
         variant="secondary"
+        size="compact"
         disabled={chosen.size === 0}
         onPress={onApply}
       />

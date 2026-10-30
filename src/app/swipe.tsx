@@ -84,8 +84,8 @@ export default function SwipeScreen() {
             onPress={() => router.back()}
           />
           <View style={styles.headerTitle}>
-            <ThemedText type="smallBold">
-              {deck.status === 'ready' ? `${numberFormat.format(deck.remaining)} left` : ''}
+            <ThemedText type="heading">
+              {deck.status === 'ready' ? `${numberFormat.format(deck.remaining)} left` : ' '}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
               {describeFilters(deck.spec)}
@@ -95,7 +95,7 @@ export default function SwipeScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Review ${deck.counts.trash} marked to delete`}
             onPress={() => router.push('/trash')}
-            style={[styles.pill, { backgroundColor: theme.backgroundElement }]}>
+            style={[styles.pill, { borderColor: theme.line }]}>
             <SymbolView name={{ ios: 'trash', android: 'delete' }} size={14} tintColor={theme.danger} />
             <ThemedText type="smallBold">
               {deck.trashBytes > 0
@@ -116,7 +116,7 @@ export default function SwipeScreen() {
               <ThemedText themeColor="textSecondary" style={styles.centerText}>
                 {`No items fit “${describeFilters(deck.spec)}”.`}
               </ThemedText>
-              <Button title="Change filters" onPress={() => router.replace('/filters')} />
+              <Button title="Change filters" onPress={() => router.replace('/filters')} style={styles.doneButton} />
             </View>
           ) : deck.status === 'done' ? (
             <View style={[styles.fill, styles.done]}>
@@ -124,7 +124,7 @@ export default function SwipeScreen() {
               <ThemedText themeColor="textSecondary" style={styles.centerText}>
                 {`Kept ${deck.counts.keep}, marked ${deck.counts.trash} to delete and saved ${deck.counts.skip} for later.`}
               </ThemedText>
-              <Button title="Done" onPress={() => router.back()} />
+              <Button title="Done" onPress={() => router.back()} style={styles.doneButton} />
             </View>
           ) : (
             <SwipeDeck
@@ -149,7 +149,7 @@ export default function SwipeScreen() {
           <IconButton
             label="Delete"
             large
-            color={theme.danger}
+            fill={theme.danger}
             name={{ ios: 'trash.fill', android: 'delete' }}
             disabled={deck.status !== 'ready'}
             onPress={() => topCard.current?.swipe('trash')}
@@ -163,7 +163,7 @@ export default function SwipeScreen() {
           <IconButton
             label="Keep"
             large
-            color={theme.success}
+            fill={theme.success}
             name={{ ios: 'heart.fill', android: 'favorite' }}
             disabled={deck.status !== 'ready'}
             onPress={() => topCard.current?.swipe('keep')}
@@ -178,12 +178,13 @@ type IconButtonProps = {
   label: string;
   name: SymbolViewProps['name'];
   onPress: () => void;
-  color?: string;
+  // The two decisions that matter get a solid marker color; the rest stay quiet.
+  fill?: string;
   large?: boolean;
   disabled?: boolean;
 };
 
-function IconButton({ label, name, onPress, color, large, disabled }: IconButtonProps) {
+function IconButton({ label, name, onPress, fill, large, disabled }: IconButtonProps) {
   const theme = useTheme();
   const size = large ? 72 : 52;
   return (
@@ -199,11 +200,12 @@ function IconButton({ label, name, onPress, color, large, disabled }: IconButton
         {
           width: size,
           height: size,
-          backgroundColor: theme.backgroundElement,
-          opacity: disabled ? 0.4 : pressed ? 0.7 : 1,
+          backgroundColor: fill ?? theme.backgroundElement,
+          opacity: disabled ? 0.4 : pressed ? 0.75 : 1,
+          transform: [{ scale: pressed && !disabled ? 0.94 : 1 }],
         },
       ]}>
-      <SymbolView name={name} size={large ? 30 : 22} tintColor={color ?? theme.text} />
+      <SymbolView name={name} size={large ? 30 : 22} tintColor={fill ? theme.background : theme.text} />
     </Pressable>
   );
 }
@@ -229,7 +231,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.one,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
+    paddingVertical: Spacing.one + 2,
+    borderWidth: 1,
     borderRadius: Spacing.four,
   },
   deckArea: {
@@ -249,6 +252,9 @@ const styles = StyleSheet.create({
   },
   centerText: {
     textAlign: 'center',
+  },
+  doneButton: {
+    alignSelf: 'stretch',
   },
   actions: {
     flexDirection: 'row',
