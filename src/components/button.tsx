@@ -6,12 +6,13 @@ import { useTheme } from '@/hooks/use-theme';
 
 type ButtonProps = Omit<PressableProps, 'children'> & {
   title: string;
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'danger';
 };
 
 export function Button({ title, variant = 'primary', style, disabled, ...rest }: ButtonProps) {
   const theme = useTheme();
-  const primary = variant === 'primary';
+  const background = { primary: theme.text, secondary: theme.backgroundElement, danger: theme.danger }[variant];
+  const foreground = { primary: theme.background, secondary: theme.text, danger: '#ffffff' }[variant];
 
   return (
     <Pressable
@@ -19,12 +20,12 @@ export function Button({ title, variant = 'primary', style, disabled, ...rest }:
       disabled={disabled}
       style={(state) => [
         styles.button,
-        { backgroundColor: primary ? theme.text : theme.backgroundElement },
+        { backgroundColor: background },
         (state.pressed || disabled) && styles.dimmed,
         typeof style === 'function' ? style(state) : style,
       ]}
       {...rest}>
-      <ThemedText type="smallBold" style={{ color: primary ? theme.background : theme.text }}>
+      <ThemedText type="smallBold" style={{ color: foreground }}>
         {title}
       </ThemedText>
     </Pressable>

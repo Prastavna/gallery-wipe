@@ -9,10 +9,10 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { getLibraryStats, type LibraryStats } from '@/db/assets';
+import { getLifetime, type Lifetime } from '@/db/trash';
 import { requestScan, useIndexStatus } from '@/features/media/indexer';
 import { useMediaPermission } from '@/features/media/permissions';
-
-const numberFormat = new Intl.NumberFormat();
+import { formatBytes, numberFormat } from '@/utils/format';
 
 export default function HomeScreen() {
   const db = useSQLiteContext();
@@ -20,9 +20,11 @@ export default function HomeScreen() {
   const limited = useMediaPermission((state) => state.response?.accessPrivileges === 'limited');
   const manageLimitedAccess = useMediaPermission((state) => state.manageLimitedAccess);
   const [stats, setStats] = useState<LibraryStats | null>(null);
+  const [lifetime, setLifetime] = useState<Lifetime | null>(null);
 
   const refreshStats = useCallback(() => {
     getLibraryStats(db).then(setStats);
+    getLifetime(db).then(setLifetime);
   }, [db]);
   // On focus, so counts reflect decisions made in the swipe deck; and after each scan.
   useFocusEffect(refreshStats);
@@ -46,6 +48,20 @@ export default function HomeScreen() {
             disabled={!stats || stats.photos === 0}
             onPress={() => router.push('/swipe')}
           />
+
+          {!!stats?.pendingTrash && (
+            <Button
+              title={`Review ${numberFormat.format(stats.pendingTrash)} to delete`}
+              variant="secondary"
+              onPress={() => router.push('/trash')}
+            />
+          )}
+
+          {!!lifetime?.bytes && (
+            <ThemedText type="small" themeColor="textSecondary">
+              {`${formatBytes(lifetime.bytes)} freed so far (${numberFormat.format(lifetime.items)} items)`}
+            </ThemedText>
+          )}
 
           {limited && (
             <ThemedView type="backgroundElement" style={styles.card}>

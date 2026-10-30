@@ -19,7 +19,9 @@ Tinder-style swiping through the device photo/video library to free up storage: 
 | `Query` filters/sorts on `creationTime`, `modificationTime`, `duration`, `width`, `height`, `mediaType`, `isFavorite`; paginates with `limit`/`offset` | Fast metadata pass via `exeForMetadata()` |
 | **No `fileSize`** on assets | Own SQLite index; size via `expo-file-system` `File(uri).size` after `asset.getUri()` |
 | iOS-only `getMediaSubtypes()` (screenshot, live, HDR) and `getIsInCloud()` | Screenshot filter on iOS; skip iCloud-only items during size enrichment. Android: detect screenshots by album name |
-| Deletion requires OS confirmation (PhotoKit / MediaStore delete request) | Batch commit from Trash screen |
+| Deletion requires OS confirmation (PhotoKit / MediaStore delete request); declining rejects the promise and deletes nothing in that batch | Batch commit from Trash screen |
+| Android 11+ `createDeleteRequest` deletes **permanently** (no Recently Deleted); Android 10 and older delete with no OS prompt | Platform-specific copy on the Trash screen; in-app confirmation on Android 10 and older |
+| iOS `getUri()` allows network access, so it would download iCloud-only assets | Always check `getIsInCloud()` before resolving a URI for size |
 | Limited access on iOS 14+ / Android 14+ | Banner + `presentPermissionsPicker()` |
 | Google Play restricts full photo/video access | File the Play Console declaration early |
 | `expo-video`: `replaceAsync` needed for iOS `ph://`; Android allows one `VideoView` per player | Pool of 2–3 players reused across cards |
@@ -121,17 +123,18 @@ A single serializable `FilterSpec` maps to SQL `WHERE`/`ORDER BY`. It is stored 
 
 **Progress header:** count reviewed and bytes marked.
 
-**Auto-commit prompt:** every 50 items or 1 GB trashed.
+**Auto-commit prompt:** every 50 items trashed in a session. The 1 GB trigger waits for milestone 5, because sizes are only measured for trash items until then. The trash count in the header opens Trash at any time. When the deck regains focus it prunes cards whose asset no longer exists, so undo never brings back a deleted photo.
 
 ## Trash and commit
 
-1. Grid of pending items. Tap or multi-select restores.
-2. Total bytes to free is shown.
-3. Commit runs `Asset.delete(chunk)` in chunks of 200–500.
-   - If the user cancels the OS dialog, items stay in Trash.
-   - On success, rows are marked committed and removed from `assets`.
-4. Summary screen shows bytes freed and a lifetime total.
-5. Tell users about the 30-day "Recently Deleted" on iOS (Android 11+ behaves similarly).
+1. Opening Trash runs a scan first, so assets deleted outside the app drop out before we ask the OS to delete them.
+2. Grid of pending items. Tap to select, then "Put back" returns them to undecided.
+3. Sizes for trash items are measured on demand (`fillMissingSizes`, 4 at a time) and cached on the asset. The total shows "+ N not measured" for iCloud-only or unreadable items.
+4. Commit uses `Asset.delete()`. On iOS it is one batch (one confirmation). On Android it uses batches of 400 to stay under the Binder transaction limit, stopping at the first declined batch.
+   - If the user declines, items stay in Trash with a "Nothing was deleted" notice.
+   - Each successful batch credits bytes to its sessions and to the lifetime total, then removes the asset, decision and album rows.
+5. Summary screen shows bytes freed, anything still in Trash, and the lifetime total. Home shows the lifetime total and a "Review N to delete" button.
+6. Platform copy: iOS → Recently Deleted for 30 days; Android → permanent.
 
 ## Permissions
 
@@ -145,7 +148,7 @@ A single serializable `FilterSpec` maps to SQL `WHERE`/`ORDER BY`. It is stored 
 - [ ] **0. Setup.** Remove template screens, drop web, install libraries, config plugins, `eas.json` dev/preview/production profiles. *Done when:* dev build runs on device. *(Code done; on-device dev build not yet verified.)*
 - [ ] **1. Index.** Permissions, SQLite schema/migrations, indexer fast pass. *Done when:* 10k+ assets indexed in under 3 s. *(Code done; on-device timing not yet verified. Home shows the asset-pass time.)*
 - [ ] **2. Photo deck.** keep/trash/skip, undo, persisted decisions. *Done when:* smooth on a mid-range Android. *(Code done, including a basic full-screen viewer; on-device smoothness not yet verified.)*
-- [ ] **3. Trash + commit.** Batch delete, cancel handling. *Done when:* real deletion works on both platforms.
+- [ ] **3. Trash + commit.** Batch delete, cancel handling. *Done when:* real deletion works on both platforms. *(Code done; on-device deletion not yet verified.)*
 - [ ] **4. Video.** Video cards, player pool, scrub, mute. *Done when:* no dropped frames moving between video cards.
 - [ ] **5. Filters.** Filter/sort sheet, presets, size enrichment, sort by size. *Done when:* all filters work and the spec persists.
 - [ ] **6. Screens.** Home stats, Library grid with multi-select delete, Summary, Settings (reset kept). *Done when:* feature-complete MVP.

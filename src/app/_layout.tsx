@@ -50,6 +50,8 @@ function RootStack() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="swipe" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
         <Stack.Screen name="viewer/[id]" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+        <Stack.Screen name="trash" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="summary" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
       </Stack.Protected>
       <Stack.Protected guard={!granted}>
         <Stack.Screen name="onboarding" />

@@ -1,8 +1,8 @@
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
-import { useRef } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useRef } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
@@ -14,17 +14,30 @@ import type { SwipeCardHandle } from '@/features/deck/swipe-card';
 import { SwipeDeck } from '@/features/deck/swipe-deck';
 import { useDeck } from '@/features/deck/use-deck';
 import { useTheme } from '@/hooks/use-theme';
+import { numberFormat } from '@/utils/format';
 
-const numberFormat = new Intl.NumberFormat();
+// Every this many deletions, offer to review and delete before the pile gets unwieldy.
+const REVIEW_PROMPT_EVERY = 50;
 
 export default function SwipeScreen() {
   const theme = useTheme();
   const deck = useDeck();
   const topCard = useRef<SwipeCardHandle>(null);
+  const { prune } = deck;
+
+  // Coming back from Trash: some cards may have just been deleted.
+  useFocusEffect(useCallback(() => prune(), [prune]));
 
   function onSwiped(item: DeckItem, decision: Decision) {
     Haptics.impactAsync(decision === 'trash' ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
     deck.decide(item, decision);
+    const trashed = deck.counts.trash + (decision === 'trash' ? 1 : 0);
+    if (decision === 'trash' && trashed % REVIEW_PROMPT_EVERY === 0) {
+      Alert.alert(`${trashed} photos marked`, 'Review and delete them now, or keep going?', [
+        { text: 'Keep swiping', style: 'cancel' },
+        { text: 'Review', onPress: () => router.push('/trash') },
+      ]);
+    }
   }
 
   function onOpen(item: DeckItem) {
@@ -43,10 +56,14 @@ export default function SwipeScreen() {
           <ThemedText type="smallBold">
             {deck.status === 'ready' ? `${numberFormat.format(deck.remaining)} left` : ''}
           </ThemedText>
-          <View style={[styles.pill, { backgroundColor: theme.backgroundElement }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Review ${deck.counts.trash} marked to delete`}
+            onPress={() => router.push('/trash')}
+            style={[styles.pill, { backgroundColor: theme.backgroundElement }]}>
             <SymbolView name={{ ios: 'trash', android: 'delete' }} size={14} tintColor={theme.danger} />
             <ThemedText type="smallBold">{numberFormat.format(deck.counts.trash)}</ThemedText>
-          </View>
+          </Pressable>
         </View>
 
         <View style={styles.deckArea}>

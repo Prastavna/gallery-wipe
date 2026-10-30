@@ -1,5 +1,5 @@
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   countDeckItems,
@@ -47,11 +47,17 @@ export function useDeck() {
   const writes = useRef<Promise<unknown>>(Promise.resolve());
   const fetching = useRef(false);
 
-  function enqueue<T>(task: () => Promise<T>): Promise<T> {
+  // Latest cards, for prune() which must stay stable across renders.
+  const cards = useRef<{ queue: DeckItem[]; history: HistoryEntry[] }>({ queue: [], history: [] });
+  useEffect(() => {
+    cards.current = { queue, history };
+  }, [queue, history]);
+
+  const enqueue = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
     const result = writes.current.then(task);
     writes.current = result.catch((error) => console.warn('Deck write failed', error));
     return result;
-  }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,7 +82,7 @@ export function useDeck() {
       const sessionToEnd = id;
       if (sessionToEnd !== null) enqueue(() => endSession(db, sessionToEnd));
     };
-  }, [db]);
+  }, [db, enqueue]);
 
   useEffect(() => {
     if (sessionId === null || exhausted || fetching.current || queue.length >= REFILL_BELOW) return;
@@ -93,7 +99,7 @@ export function useDeck() {
       .finally(() => {
         fetching.current = false;
       });
-  }, [db, sessionId, exhausted, queue]);
+  }, [db, enqueue, sessionId, exhausted, queue]);
 
   function decide(item: DeckItem, decision: Decision) {
     if (sessionId === null) return;
@@ -121,6 +127,24 @@ export function useDeck() {
     enqueue(async () => restoreDecision(db, entry.item.id, await entry.previous));
   }
 
+  // Drops cards whose asset no longer exists (e.g. just deleted from the Trash screen), so undo
+  // never brings back a photo that is gone.
+  const prune = useCallback(() => {
+    const { queue: queued, history: done } = cards.current;
+    const ids = [...queued.map((item) => item.id), ...done.map((entry) => entry.item.id)];
+    if (ids.length === 0) return;
+    enqueue(() =>
+      db.getAllAsync<{ id: string }>(
+        'SELECT id FROM assets WHERE id IN (SELECT value FROM json_each(?))',
+        JSON.stringify(ids)
+      )
+    ).then((rows) => {
+      const existing = new Set(rows.map((row) => row.id));
+      setQueue((current) => current.filter((item) => existing.has(item.id)));
+      setHistory((current) => current.filter((entry) => existing.has(entry.item.id)));
+    });
+  }, [db, enqueue]);
+
   const status: DeckStatus = loading ? 'loading' : queue.length === 0 && exhausted ? 'done' : 'ready';
 
   return {
@@ -132,5 +156,6 @@ export function useDeck() {
     canUndo: history.length > 0,
     decide,
     undo,
+    prune,
   };
 }
