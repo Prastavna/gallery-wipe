@@ -22,6 +22,7 @@ export type LibraryStats = {
   screenshots: number;
   albums: number;
   reviewed: number;
+  pendingTrash: number;
 };
 
 // Rows are passed as one JSON array per statement so a page of 500 assets costs a single native
@@ -130,8 +131,12 @@ export async function getLibraryStats(db: SQLiteDatabase): Promise<LibraryStats>
        COALESCE(SUM(media_type = 'video'), 0) AS videos,
        COALESCE(SUM(is_screenshot), 0) AS screenshots,
        (SELECT COUNT(*) FROM albums) AS albums,
-       (SELECT COUNT(*) FROM decisions d JOIN assets a ON a.id = d.asset_id) AS reviewed
+       (SELECT COUNT(*) FROM decisions d JOIN assets a ON a.id = d.asset_id) AS reviewed,
+       (SELECT COUNT(*) FROM decisions d JOIN assets a ON a.id = d.asset_id
+        WHERE d.decision = 'trash') AS pendingTrash
      FROM assets`
   );
-  return row ?? { total: 0, photos: 0, videos: 0, screenshots: 0, albums: 0, reviewed: 0 };
+  return (
+    row ?? { total: 0, photos: 0, videos: 0, screenshots: 0, albums: 0, reviewed: 0, pendingTrash: 0 }
+  );
 }

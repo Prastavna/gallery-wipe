@@ -51,7 +51,7 @@ src/
     summary.tsx             # post-commit "Freed X GB"
   features/
     media/   indexer.ts, query-builder.ts, delete.ts, permissions.ts
-    deck/    SwipeDeck.tsx, SwipeCard.tsx, VideoCard.tsx, useDeck.ts, player-pool.ts
+    deck/    swipe-deck.tsx, swipe-card.tsx, video-card.tsx, use-deck.ts, player-pool.ts
     filters/ types.ts, presets.ts, FilterSheet.tsx
     trash/   TrashGrid.tsx, useTrash.ts
   db/        schema.ts, migrations.ts, repo.ts
@@ -107,10 +107,11 @@ A single serializable `FilterSpec` maps to SQL `WHERE`/`ORDER BY`. It is stored 
 - Tap opens the viewer; long-press shows info.
 - On-screen buttons mirror every gesture.
 
-**Undo:** reverses the last N decisions. This is free because nothing is deleted until commit.
+**Undo:** reverses the last 50 decisions. This is free because nothing is deleted until commit. Decisions are written to SQLite immediately through a serial write chain (decide → undo → refill stay ordered). Undo restores whatever decision the item had before, and the card flies back in from the side it left.
 
 **Rendering:**
-- 3 mounted cards. `expo-image` with `recyclingKey`; prefetch the next ~5.
+- 3 mounted cards. `expo-image` with `recyclingKey` and `cachePolicy="memory"`. The two cards behind the top one act as the prefetch. `Image.prefetch` is deliberately not used: it decodes full-resolution library photos with no target size, which costs too much memory.
+- Each card owns its own shared values, so a removed card never hands a mid-animation transform to the next one. Shared values use `.get()`/`.set()` (required under the React Compiler).
 - All motion in Reanimated worklets, with threshold stamps and a haptic on crossing.
 
 **Video:**
@@ -143,7 +144,7 @@ A single serializable `FilterSpec` maps to SQL `WHERE`/`ORDER BY`. It is stored 
 
 - [ ] **0. Setup.** Remove template screens, drop web, install libraries, config plugins, `eas.json` dev/preview/production profiles. *Done when:* dev build runs on device. *(Code done; on-device dev build not yet verified.)*
 - [ ] **1. Index.** Permissions, SQLite schema/migrations, indexer fast pass. *Done when:* 10k+ assets indexed in under 3 s. *(Code done; on-device timing not yet verified. Home shows the asset-pass time.)*
-- [ ] **2. Photo deck.** keep/trash/skip, undo, persisted decisions. *Done when:* smooth on a mid-range Android.
+- [ ] **2. Photo deck.** keep/trash/skip, undo, persisted decisions. *Done when:* smooth on a mid-range Android. *(Code done, including a basic full-screen viewer; on-device smoothness not yet verified.)*
 - [ ] **3. Trash + commit.** Batch delete, cancel handling. *Done when:* real deletion works on both platforms.
 - [ ] **4. Video.** Video cards, player pool, scrub, mute. *Done when:* no dropped frames moving between video cards.
 - [ ] **5. Filters.** Filter/sort sheet, presets, size enrichment, sort by size. *Done when:* all filters work and the spec persists.

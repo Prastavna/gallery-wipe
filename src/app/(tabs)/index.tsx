@@ -1,5 +1,6 @@
+import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -20,9 +21,14 @@ export default function HomeScreen() {
   const manageLimitedAccess = useMediaPermission((state) => state.manageLimitedAccess);
   const [stats, setStats] = useState<LibraryStats | null>(null);
 
-  useEffect(() => {
+  const refreshStats = useCallback(() => {
     getLibraryStats(db).then(setStats);
-  }, [db, version]);
+  }, [db]);
+  // On focus, so counts reflect decisions made in the swipe deck; and after each scan.
+  useFocusEffect(refreshStats);
+  useEffect(() => {
+    if (version > 0) refreshStats();
+  }, [version, refreshStats]);
 
   async function onManageAccess() {
     await manageLimitedAccess();
@@ -34,6 +40,12 @@ export default function HomeScreen() {
       <SafeAreaView edges={['top']} style={styles.container}>
         <ScrollView contentContainerStyle={styles.content}>
           <ThemedText type="subtitle">Gallery Wipe</ThemedText>
+
+          <Button
+            title="Start cleaning"
+            disabled={!stats || stats.photos === 0}
+            onPress={() => router.push('/swipe')}
+          />
 
           {limited && (
             <ThemedView type="backgroundElement" style={styles.card}>
@@ -53,6 +65,7 @@ export default function HomeScreen() {
             <Stat label="Screenshots" value={stats?.screenshots} />
             <Stat label="Albums" value={stats?.albums} />
             <Stat label="Reviewed" value={stats?.reviewed} />
+            <Stat label="Marked to delete" value={stats?.pendingTrash} />
           </ThemedView>
 
           <ThemedText type="small" themeColor="textSecondary">

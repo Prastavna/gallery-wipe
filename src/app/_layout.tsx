@@ -48,6 +48,8 @@ function RootStack() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={granted}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="swipe" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
+        <Stack.Screen name="viewer/[id]" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
       </Stack.Protected>
       <Stack.Protected guard={!granted}>
         <Stack.Screen name="onboarding" />
