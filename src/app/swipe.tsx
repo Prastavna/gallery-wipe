@@ -13,15 +13,18 @@ import type { Decision, DeckItem } from '@/db/decisions';
 import type { SwipeCardHandle } from '@/features/deck/swipe-card';
 import { SwipeDeck } from '@/features/deck/swipe-deck';
 import { useDeck } from '@/features/deck/use-deck';
+import { describeFilters } from '@/features/filters/spec';
+import { useFilters } from '@/features/filters/store';
 import { useTheme } from '@/hooks/use-theme';
-import { numberFormat } from '@/utils/format';
+import { formatBytes, numberFormat } from '@/utils/format';
 
-// Every this many deletions, offer to review and delete before the pile gets unwieldy.
-const REVIEW_PROMPT_EVERY = 50;
+// Offer to review and delete before the pile gets unwieldy: every this many items or bytes.
+const REVIEW_PROMPT_EVERY_ITEMS = 50;
+const REVIEW_PROMPT_EVERY_BYTES = 1_000_000_000;
 
 export default function SwipeScreen() {
   const theme = useTheme();
-  const deck = useDeck();
+  const deck = useDeck(useFilters((state) => state.spec));
   const topCard = useRef<SwipeCardHandle>(null);
   const focused = useIsFocused();
   const { prune } = deck;
@@ -32,9 +35,14 @@ export default function SwipeScreen() {
   function onSwiped(item: DeckItem, decision: Decision) {
     Haptics.impactAsync(decision === 'trash' ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
     deck.decide(item, decision);
-    const trashed = deck.counts.trash + (decision === 'trash' ? 1 : 0);
-    if (decision === 'trash' && trashed % REVIEW_PROMPT_EVERY === 0) {
-      Alert.alert(`${trashed} items marked`, 'Review and delete them now, or keep going?', [
+    if (decision !== 'trash') return;
+    const trashed = deck.counts.trash + 1;
+    const bytes = deck.trashBytes + (item.size ?? 0);
+    const crossedBytes =
+      Math.floor(bytes / REVIEW_PROMPT_EVERY_BYTES) > Math.floor(deck.trashBytes / REVIEW_PROMPT_EVERY_BYTES);
+    if (trashed % REVIEW_PROMPT_EVERY_ITEMS === 0 || crossedBytes) {
+      const title = crossedBytes ? `${formatBytes(bytes)} marked` : `${trashed} items marked`;
+      Alert.alert(title, 'Review and delete them now, or keep going?', [
         { text: 'Keep swiping', style: 'cancel' },
         { text: 'Review', onPress: () => router.push('/trash') },
       ]);
@@ -54,16 +62,25 @@ export default function SwipeScreen() {
             name={{ ios: 'xmark', android: 'close' }}
             onPress={() => router.back()}
           />
-          <ThemedText type="smallBold">
-            {deck.status === 'ready' ? `${numberFormat.format(deck.remaining)} left` : ''}
-          </ThemedText>
+          <View style={styles.headerTitle}>
+            <ThemedText type="smallBold">
+              {deck.status === 'ready' ? `${numberFormat.format(deck.remaining)} left` : ''}
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+              {describeFilters(deck.spec)}
+            </ThemedText>
+          </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Review ${deck.counts.trash} marked to delete`}
             onPress={() => router.push('/trash')}
             style={[styles.pill, { backgroundColor: theme.backgroundElement }]}>
             <SymbolView name={{ ios: 'trash', android: 'delete' }} size={14} tintColor={theme.danger} />
-            <ThemedText type="smallBold">{numberFormat.format(deck.counts.trash)}</ThemedText>
+            <ThemedText type="smallBold">
+              {deck.trashBytes > 0
+                ? `${numberFormat.format(deck.counts.trash)} · ${formatBytes(deck.trashBytes)}`
+                : numberFormat.format(deck.counts.trash)}
+            </ThemedText>
           </Pressable>
         </View>
 
@@ -169,6 +186,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
+  },
+  headerTitle: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: Spacing.two,
   },
   pill: {
     flexDirection: 'row',

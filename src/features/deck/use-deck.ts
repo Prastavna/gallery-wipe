@@ -13,6 +13,8 @@ import {
   type DecisionRecord,
   type DeckItem,
 } from '@/db/decisions';
+import { buildDeckQuery, type DeckQuery } from '@/features/filters/query';
+import type { FilterSpec } from '@/features/filters/spec';
 
 const PAGE_SIZE = 12;
 const REFILL_BELOW = 6;
@@ -30,15 +32,19 @@ export type DeckStatus = 'loading' | 'ready' | 'done';
 const EMPTY_COUNTS: Record<Decision, number> = { keep: 0, trash: 0, skip: 0 };
 
 /**
- * Drives one swipe session. Decisions are written to SQLite immediately (so a crash loses
- * nothing) through a serial write chain, which keeps decide → undo → refill in order.
+ * Drives one swipe session over the items matching `initialSpec` (fixed for the session's life).
+ * Decisions are written to SQLite immediately (so a crash loses nothing) through a serial write
+ * chain, which keeps decide → undo → refill in order.
  */
-export function useDeck() {
+export function useDeck(initialSpec: FilterSpec) {
   const db = useSQLiteContext();
-  const [sessionId, setSessionId] = useState<number | null>(null);
+  const [spec] = useState(initialSpec);
+  const [session, setSession] = useState<{ id: number; query: DeckQuery } | null>(null);
   const [queue, setQueue] = useState<DeckItem[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [counts, setCounts] = useState(EMPTY_COUNTS);
+  // Known size of everything marked for deletion this session; unmeasured items count as 0.
+  const [trashBytes, setTrashBytes] = useState(0);
   const [remaining, setRemaining] = useState(0);
   const [exhausted, setExhausted] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -64,16 +70,18 @@ export function useDeck() {
     let id: number | null = null;
 
     (async () => {
-      id = await startSession(db, { preset: 'all' });
+      id = await startSession(db, spec);
+      const query = buildDeckQuery(spec, id);
+      const firstPage = spec.limit ? Math.min(PAGE_SIZE, spec.limit) : PAGE_SIZE;
       const [total, items] = await Promise.all([
-        countDeckItems(db, id),
-        getDeckItems(db, id, [], PAGE_SIZE),
+        countDeckItems(db, query),
+        getDeckItems(db, query, [], firstPage),
       ]);
       if (cancelled) return;
-      setSessionId(id);
-      setRemaining(total);
+      setSession({ id, query });
+      setRemaining(spec.limit ? Math.min(total, spec.limit) : total);
       setQueue(items);
-      setExhausted(items.length < PAGE_SIZE);
+      setExhausted(items.length < firstPage);
       setLoading(false);
     })();
 
@@ -82,15 +90,22 @@ export function useDeck() {
       const sessionToEnd = id;
       if (sessionToEnd !== null) enqueue(() => endSession(db, sessionToEnd));
     };
-  }, [db, enqueue]);
+  }, [db, enqueue, spec]);
+
+  // With a session limit ("Random 50"), stop once decided + queued reaches it.
+  const decided = counts.keep + counts.trash + counts.skip;
+  const limitReached = spec.limit !== null && decided + queue.length >= spec.limit;
 
   useEffect(() => {
-    if (sessionId === null || exhausted || fetching.current || queue.length >= REFILL_BELOW) return;
+    if (session === null || exhausted || limitReached || fetching.current || queue.length >= REFILL_BELOW) {
+      return;
+    }
+    const wanted = spec.limit ? Math.min(PAGE_SIZE, spec.limit - decided - queue.length) : PAGE_SIZE;
     fetching.current = true;
     const excludeIds = queue.map((item) => item.id);
-    enqueue(() => getDeckItems(db, sessionId, excludeIds, PAGE_SIZE))
+    enqueue(() => getDeckItems(db, session.query, excludeIds, wanted))
       .then((items) => {
-        if (items.length < PAGE_SIZE) setExhausted(true);
+        if (items.length < wanted) setExhausted(true);
         setQueue((current) => {
           const seen = new Set(current.map((item) => item.id));
           return [...current, ...items.filter((item) => !seen.has(item.id))];
@@ -99,12 +114,14 @@ export function useDeck() {
       .finally(() => {
         fetching.current = false;
       });
-  }, [db, enqueue, sessionId, exhausted, queue]);
+  }, [db, enqueue, session, exhausted, limitReached, queue, decided, spec.limit]);
 
   function decide(item: DeckItem, decision: Decision) {
-    if (sessionId === null) return;
+    if (session === null) return;
+    const sessionId = session.id;
     setQueue((current) => current.filter((queued) => queued.id !== item.id));
     setCounts((current) => ({ ...current, [decision]: current[decision] + 1 }));
+    if (decision === 'trash') setTrashBytes((current) => current + (item.size ?? 0));
     setRemaining((current) => Math.max(0, current - 1));
     setRestored(null);
 
@@ -122,6 +139,7 @@ export function useDeck() {
     setHistory((current) => current.slice(0, -1));
     setQueue((current) => [entry.item, ...current.filter((queued) => queued.id !== entry.item.id)]);
     setCounts((current) => ({ ...current, [entry.decision]: current[entry.decision] - 1 }));
+    if (entry.decision === 'trash') setTrashBytes((current) => current - (entry.item.size ?? 0));
     setRemaining((current) => current + 1);
     setRestored({ id: entry.item.id, decision: entry.decision });
     enqueue(async () => restoreDecision(db, entry.item.id, await entry.previous));
@@ -145,12 +163,15 @@ export function useDeck() {
     });
   }, [db, enqueue]);
 
-  const status: DeckStatus = loading ? 'loading' : queue.length === 0 && exhausted ? 'done' : 'ready';
+  const status: DeckStatus =
+    loading ? 'loading' : queue.length === 0 && (exhausted || limitReached) ? 'done' : 'ready';
 
   return {
     status,
     queue,
     counts,
+    trashBytes,
+    spec,
     remaining,
     restored,
     canUndo: history.length > 0,

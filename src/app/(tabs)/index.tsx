@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
@@ -10,6 +10,8 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { getLibraryStats, type LibraryStats } from '@/db/assets';
 import { getLifetime, type Lifetime } from '@/db/trash';
+import { describeFilters, PRESETS, type FilterSpec } from '@/features/filters/spec';
+import { useFilters } from '@/features/filters/store';
 import { requestScan, useIndexStatus } from '@/features/media/indexer';
 import { useMediaPermission } from '@/features/media/permissions';
 import { formatBytes, numberFormat } from '@/utils/format';
@@ -21,6 +23,8 @@ export default function HomeScreen() {
   const manageLimitedAccess = useMediaPermission((state) => state.manageLimitedAccess);
   const [stats, setStats] = useState<LibraryStats | null>(null);
   const [lifetime, setLifetime] = useState<Lifetime | null>(null);
+  const filters = useFilters((state) => state.spec);
+  const applyFilters = useFilters((state) => state.apply);
 
   const refreshStats = useCallback(() => {
     getLibraryStats(db).then(setStats);
@@ -31,6 +35,11 @@ export default function HomeScreen() {
   useEffect(() => {
     if (version > 0) refreshStats();
   }, [version, refreshStats]);
+
+  async function startPreset(spec: FilterSpec) {
+    await applyFilters(db, spec);
+    router.push('/swipe');
+  }
 
   async function onManageAccess() {
     await manageLimitedAccess();
@@ -48,6 +57,38 @@ export default function HomeScreen() {
             disabled={!stats || stats.total === 0}
             onPress={() => router.push('/swipe')}
           />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Filters: ${describeFilters(filters)}`}
+            onPress={() => router.push('/filters')}
+            style={styles.filterLink}>
+            <ThemedText type="small" themeColor="textSecondary" numberOfLines={2} style={styles.filterText}>
+              {describeFilters(filters)}
+            </ThemedText>
+            <ThemedText type="smallBold">Filters</ThemedText>
+          </Pressable>
+
+          <View style={styles.presets}>
+            <ThemedText type="smallBold">Quick clean</ThemedText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetRow}>
+              {PRESETS.map((preset) => (
+                <Pressable
+                  key={preset.key}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${preset.title}, ${preset.subtitle}`}
+                  disabled={!stats || stats.total === 0}
+                  onPress={() => startPreset(preset.spec)}
+                  style={({ pressed }) => [styles.preset, { opacity: pressed ? 0.7 : 1 }]}>
+                  <ThemedView type="backgroundElement" style={styles.presetCard}>
+                    <ThemedText type="smallBold">{preset.title}</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {preset.subtitle}
+                    </ThemedText>
+                  </ThemedView>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
 
           {!!stats?.pendingTrash && (
             <Button
@@ -122,6 +163,30 @@ const styles = StyleSheet.create({
     gap: Spacing.four,
     padding: Spacing.four,
     paddingBottom: BottomTabInset + Spacing.four,
+  },
+  filterLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    marginTop: -Spacing.two,
+  },
+  filterText: {
+    flex: 1,
+  },
+  presets: {
+    gap: Spacing.two,
+  },
+  presetRow: {
+    gap: Spacing.two,
+  },
+  preset: {
+    width: 140,
+  },
+  presetCard: {
+    gap: Spacing.half,
+    padding: Spacing.three,
+    borderRadius: Spacing.three,
+    minHeight: 72,
   },
   card: {
     gap: Spacing.two,

@@ -54,7 +54,7 @@ src/
   features/
     media/   indexer.ts, query-builder.ts, delete.ts, permissions.ts
     deck/    swipe-deck.tsx, swipe-card.tsx, video-layer.tsx, use-deck.ts
-    filters/ types.ts, presets.ts, FilterSheet.tsx
+    filters/ spec.ts, query.ts, store.ts
     trash/   TrashGrid.tsx, useTrash.ts
   db/        schema.ts, migrations.ts, repo.ts
   store/     session.ts, filters.ts
@@ -89,18 +89,22 @@ Migrations are an append-only list in `src/db/migrations.ts`, tracked with `PRAG
 
 ## Filters and sort
 
-**Filters:**
-- Media type, date range (with presets), albums (include/exclude)
-- Size > X MB, video duration > X s
-- Screenshots, favorites (excluded by default), orientation
-- File type (HEIC/PNG/GIF/MP4…), has location
-- Review state (not reviewed / kept / skipped), exclude iCloud-only (iOS)
+**Filters** (`FilterSpec` in `src/features/filters/spec.ts`):
+- Media type; date presets (this month, last 30 days, this year, over 1 / 2 years old); albums (include)
+- Size ≥ 5/25/100/500 MB; video length ≥ 30 s / 1 min / 5 min
+- Screenshots only; include favorites (off by default); orientation
+- File type (from the extensions actually in the library); exclude iCloud-only (iOS)
+- Review state: not reviewed / saved for later / previously kept
 
-**Sort:** newest, oldest, largest, longest video, random, by album.
+**Sort:** newest, oldest, largest, longest video, random, by album. Items without a measured size sort last under "largest".
 
-**Presets:** Biggest videos, Screenshots, Old stuff (>2y), This month, Random 50.
+**Presets on Home:** Biggest videos, Screenshots, Old stuff (>2y), This month, Random 50 (a session `limit`). A preset replaces the current filters and starts a deck.
 
-A single serializable `FilterSpec` maps to SQL `WHERE`/`ORDER BY`. It is stored per session so the user can resume.
+`buildDeckQuery(spec, sessionId)` (`src/features/filters/query.ts`) is a pure function from spec to SQL `WHERE`/`ORDER BY`. The deck pages with "exclude the ids already queued", which keeps random order stable across refills. Filters persist in `settings`; each session stores its spec in `sessions.filter_spec`. The filter sheet (form sheet) shows a live match count.
+
+**Dropped from the original list:** "has location". It would need a per-asset `getLocation()` call during indexing, which is too slow for the fast pass. "Exclude albums" was also dropped; include-only is enough.
+
+**Size measurement:** runs in the background after every scan. It measures videos first, then newest first, in batches of 60 with a 150 ms pause between batches. Rows are marked attempted via `enriched_at` so failures are not retried in a loop. Modified files are re-measured automatically, because the upsert clears `enriched_at`. The filter sheet notes when size-based results are still filling in.
 
 ## Swipe deck
 
@@ -124,9 +128,9 @@ A single serializable `FilterSpec` maps to SQL `WHERE`/`ORDER BY`. It is stored 
 - The scrub bar `block`s the card's swipe pan and turns `scrubbingModeOptions` on only while dragging. Progress comes from `timeUpdate` events (every 0.25 s) into a shared value, so the bar never re-renders React.
 - The viewer plays videos full screen with native controls and sound.
 
-**Progress header:** count reviewed and bytes marked.
+**Progress header:** items left, the active filter summary, and a trash pill with count and bytes marked.
 
-**Auto-commit prompt:** every 50 items trashed in a session. The 1 GB trigger waits for milestone 5, because sizes are only measured for trash items until then. The trash count in the header opens Trash at any time. When the deck regains focus it prunes cards whose asset no longer exists, so undo never brings back a deleted photo.
+**Auto-commit prompt:** every 50 items or every 1 GB trashed in a session (bytes count only measured items). The trash count in the header opens Trash at any time. When the deck regains focus it prunes cards whose asset no longer exists, so undo never brings back a deleted photo.
 
 ## Trash and commit
 
@@ -153,7 +157,7 @@ A single serializable `FilterSpec` maps to SQL `WHERE`/`ORDER BY`. It is stored 
 - [ ] **2. Photo deck.** keep/trash/skip, undo, persisted decisions. *Done when:* smooth on a mid-range Android. *(Code done, including a basic full-screen viewer; on-device smoothness not yet verified.)*
 - [ ] **3. Trash + commit.** Batch delete, cancel handling. *Done when:* real deletion works on both platforms. *(Code done; on-device deletion not yet verified.)*
 - [ ] **4. Video.** Video cards, player pool, scrub, mute. *Done when:* no dropped frames moving between video cards. *(Code done; on-device frame rate and Android video posters not yet verified.)*
-- [ ] **5. Filters.** Filter/sort sheet, presets, size enrichment, sort by size. *Done when:* all filters work and the spec persists.
+- [ ] **5. Filters.** Filter/sort sheet, presets, size enrichment, sort by size. *Done when:* all filters work and the spec persists. *(Code done; every filter and sort verified against SQLite; on-device size measurement speed not yet verified.)*
 - [ ] **6. Screens.** Home stats, Library grid with multi-select delete, Summary, Settings (reset kept). *Done when:* feature-complete MVP.
 - [ ] **7. Polish.** Haptics, dark mode, accessibility labels, empty and error states (iCloud, missing files). *Done when:* TestFlight / Play internal test.
 - [ ] **8. Post-MVP.** Similar/duplicate detection, burst grouping, video compression offer, widgets.

@@ -1,5 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import type { DeckQuery } from '@/features/filters/query';
+
 export type Decision = 'keep' | 'trash' | 'skip';
 
 export type DecisionRecord = {
@@ -15,40 +17,37 @@ export type DeckItem = {
   duration: number | null;
   width: number | null;
   height: number | null;
+  // Bytes, once measured.
+  size: number | null;
   creationTime: number | null;
   filename: string | null;
 };
 
-// What the deck shows: items with no decision yet, plus ones skipped in an earlier session.
-// "Keep" is permanent, "trash" waits in the Trash screen, favorites are never offered.
-const DECK_FILTER = `
-  a.is_favorite = 0
-  AND (d.asset_id IS NULL OR (d.decision = 'skip' AND d.session_id IS NOT $sessionId))
-`;
-
+// Deck queries come from buildDeckQuery (src/features/filters/query.ts), whose WHERE runs over
+// `assets a LEFT JOIN decisions d ON d.asset_id = a.id`.
 export async function getDeckItems(
   db: SQLiteDatabase,
-  sessionId: number,
+  query: DeckQuery,
   excludeIds: string[],
   limit: number
 ): Promise<DeckItem[]> {
   return db.getAllAsync<DeckItem>(
-    `SELECT a.id, a.media_type AS mediaType, a.duration, a.width, a.height,
+    `SELECT a.id, a.media_type AS mediaType, a.duration, a.width, a.height, a.size,
             a.creation_time AS creationTime, a.filename
      FROM assets a LEFT JOIN decisions d ON d.asset_id = a.id
-     WHERE ${DECK_FILTER}
+     WHERE ${query.where}
        AND a.id NOT IN (SELECT value FROM json_each($exclude))
-     ORDER BY a.creation_time DESC, a.id DESC
+     ORDER BY ${query.orderBy}
      LIMIT $limit`,
-    { $sessionId: sessionId, $exclude: JSON.stringify(excludeIds), $limit: limit }
+    { ...query.params, $exclude: JSON.stringify(excludeIds), $limit: limit }
   );
 }
 
-export async function countDeckItems(db: SQLiteDatabase, sessionId: number): Promise<number> {
+export async function countDeckItems(db: SQLiteDatabase, query: DeckQuery): Promise<number> {
   const row = await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) AS count FROM assets a LEFT JOIN decisions d ON d.asset_id = a.id
-     WHERE ${DECK_FILTER}`,
-    { $sessionId: sessionId }
+     WHERE ${query.where}`,
+    query.params
   );
   return row?.count ?? 0;
 }
