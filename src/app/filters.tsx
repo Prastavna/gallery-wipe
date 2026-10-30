@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Platform, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -139,6 +139,21 @@ export default function FiltersScreen() {
   function toggleIn(list: string[], value: string) {
     return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
   }
+
+  // Swiping the sheet away or pressing back keeps the changes too; only a deck with no matches is dropped.
+  const latest = useRef({ draft, matches });
+  useEffect(() => {
+    latest.current = { draft, matches };
+  }, [draft, matches]);
+  useEffect(
+    () => () => {
+      const { draft: final, matches: finalMatches } = latest.current;
+      if (finalMatches === 0) return;
+      if (JSON.stringify(final) === JSON.stringify(useFilters.getState().spec)) return;
+      useFilters.getState().apply(db, final);
+    },
+    [db]
+  );
 
   async function onApply() {
     await apply(db, draft);
