@@ -28,6 +28,9 @@ const REDUCED_FLY_OUT_MS = 120;
 const MAX_ROTATION_DEG = 12;
 const SPRING = { damping: 18, stiffness: 180 };
 
+// Wide enough for the longest mark, "Delete", with room to spare.
+const STAMP_WIDTH = 240;
+
 // Grease pencil on a print: these sit on top of the photo, so they stay bright in either theme.
 const MARKER: Record<Decision, string> = {
   keep: '#4BE39A',
@@ -263,18 +266,44 @@ export function SwipeCard({
         </Pressable>
 
         <Animated.View style={[styles.stamp, styles.stampLeft, keepStampStyle]} pointerEvents="none">
-          <Text style={[styles.mark, { color: MARKER.keep }]}>Keep</Text>
-          <View style={[styles.underline, { backgroundColor: MARKER.keep }]} />
+          <Mark label="Keep" color={MARKER.keep} align="left" underline />
         </Animated.View>
         <Animated.View style={[styles.stamp, styles.stampRight, trashStampStyle]} pointerEvents="none">
-          <Text style={[styles.mark, { color: MARKER.trash }]}>Delete</Text>
-          <View style={[styles.underline, { backgroundColor: MARKER.trash }]} />
+          <Mark label="Delete" color={MARKER.trash} align="right" underline />
         </Animated.View>
         <Animated.View style={[styles.stamp, styles.stampBottom, skipStampStyle]} pointerEvents="none">
-          <Text style={[styles.mark, { color: MARKER.skip }]}>Later</Text>
+          <Mark label="Later" color={MARKER.skip} align="center" />
         </Animated.View>
       </Animated.View>
     </GestureDetector>
+  );
+}
+
+type MarkProps = { label: string; color: string; align: 'left' | 'right' | 'center'; underline?: boolean };
+
+/**
+ * A word scrawled on the print. The text fills a fixed-width stamp rather than sizing to fit:
+ * Android measures the marker font narrower than it draws, which clipped the last letter.
+ */
+function Mark({ label, color, align, underline }: MarkProps) {
+  const [inkWidth, setInkWidth] = useState(0);
+  return (
+    <>
+      <Text
+        onTextLayout={(event) => setInkWidth(event.nativeEvent.lines[0]?.width ?? 0)}
+        style={[styles.mark, { color, textAlign: align }]}>
+        {label}
+      </Text>
+      {underline && inkWidth > 0 && (
+        <View
+          style={[
+            styles.underline,
+            { width: inkWidth * 0.9, backgroundColor: color },
+            align === 'left' ? styles.alignStart : styles.alignEnd,
+          ]}
+        />
+      )}
+    </>
   );
 }
 
@@ -329,7 +358,7 @@ const styles = StyleSheet.create({
   },
   stamp: {
     position: 'absolute',
-    alignItems: 'center',
+    width: STAMP_WIDTH,
   },
   mark: {
     fontFamily: FontFamily.marker,
@@ -343,10 +372,16 @@ const styles = StyleSheet.create({
   // A quick stroke under the word, as an editor would scrawl it.
   underline: {
     height: 5,
-    width: '86%',
     marginTop: -Spacing.two,
+    marginHorizontal: Spacing.two,
     borderRadius: 3,
     transform: [{ rotate: '-2deg' }],
+  },
+  alignStart: {
+    alignSelf: 'flex-start',
+  },
+  alignEnd: {
+    alignSelf: 'flex-end',
   },
   stampLeft: {
     top: Spacing.five,
@@ -360,7 +395,8 @@ const styles = StyleSheet.create({
   },
   stampBottom: {
     bottom: Spacing.six + Spacing.four,
-    alignSelf: 'center',
+    left: '50%',
+    marginLeft: -STAMP_WIDTH / 2,
     transform: [{ rotate: '-4deg' }],
   },
 });
