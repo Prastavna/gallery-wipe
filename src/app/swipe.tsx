@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { useCallback, useRef } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
@@ -23,6 +23,7 @@ export default function SwipeScreen() {
   const theme = useTheme();
   const deck = useDeck();
   const topCard = useRef<SwipeCardHandle>(null);
+  const focused = useIsFocused();
   const { prune } = deck;
 
   // Coming back from Trash: some cards may have just been deleted.
@@ -33,7 +34,7 @@ export default function SwipeScreen() {
     deck.decide(item, decision);
     const trashed = deck.counts.trash + (decision === 'trash' ? 1 : 0);
     if (decision === 'trash' && trashed % REVIEW_PROMPT_EVERY === 0) {
-      Alert.alert(`${trashed} photos marked`, 'Review and delete them now, or keep going?', [
+      Alert.alert(`${trashed} items marked`, 'Review and delete them now, or keep going?', [
         { text: 'Keep swiping', style: 'cancel' },
         { text: 'Review', onPress: () => router.push('/trash') },
       ]);
@@ -41,7 +42,7 @@ export default function SwipeScreen() {
   }
 
   function onOpen(item: DeckItem) {
-    router.push({ pathname: '/viewer/[id]', params: { id: item.id } });
+    router.push({ pathname: '/viewer/[id]', params: { id: item.id, mediaType: item.mediaType } });
   }
 
   return (
@@ -81,6 +82,7 @@ export default function SwipeScreen() {
             <SwipeDeck
               queue={deck.queue}
               restored={deck.restored}
+              focused={focused}
               onSwiped={onSwiped}
               onOpen={onOpen}
               topCardRef={topCard}

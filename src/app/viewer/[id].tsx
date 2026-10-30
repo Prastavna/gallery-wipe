@@ -1,15 +1,20 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ViewerScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, mediaType } = useLocalSearchParams<{ id: string; mediaType?: 'image' | 'video' }>();
 
   return (
     <View style={styles.container}>
-      <Image source={{ uri: id }} contentFit="contain" cachePolicy="memory" style={StyleSheet.absoluteFill} />
+      {mediaType === 'video' ? (
+        <FullVideo uri={id} />
+      ) : (
+        <Image source={{ uri: id }} contentFit="contain" cachePolicy="memory" style={StyleSheet.absoluteFill} />
+      )}
       <SafeAreaView style={styles.overlay} pointerEvents="box-none">
         <Pressable
           accessibilityRole="button"
@@ -22,6 +27,14 @@ export default function ViewerScreen() {
       </SafeAreaView>
     </View>
   );
+}
+
+function FullVideo({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, (created) => {
+    created.play();
+  });
+
+  return <VideoView player={player} nativeControls contentFit="contain" style={StyleSheet.absoluteFill} />;
 }
 
 const styles = StyleSheet.create({

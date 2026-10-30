@@ -45,7 +45,7 @@ export default function HomeScreen() {
 
           <Button
             title="Start cleaning"
-            disabled={!stats || stats.photos === 0}
+            disabled={!stats || stats.total === 0}
             onPress={() => router.push('/swipe')}
           />
 

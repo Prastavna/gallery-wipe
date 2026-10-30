@@ -64,7 +64,7 @@ export function useDeck() {
     let id: number | null = null;
 
     (async () => {
-      id = await startSession(db, { preset: 'all-photos' });
+      id = await startSession(db, { preset: 'all' });
       const [total, items] = await Promise.all([
         countDeckItems(db, id),
         getDeckItems(db, id, [], PAGE_SIZE),

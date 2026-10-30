@@ -10,17 +10,19 @@ export type DecisionRecord = {
 
 export type DeckItem = {
   id: string;
+  mediaType: 'image' | 'video';
+  // Milliseconds; videos only.
+  duration: number | null;
   width: number | null;
   height: number | null;
   creationTime: number | null;
   filename: string | null;
 };
 
-// What the deck shows: photos with no decision yet, plus ones skipped in an earlier session.
+// What the deck shows: items with no decision yet, plus ones skipped in an earlier session.
 // "Keep" is permanent, "trash" waits in the Trash screen, favorites are never offered.
 const DECK_FILTER = `
-  a.media_type = 'image'
-  AND a.is_favorite = 0
+  a.is_favorite = 0
   AND (d.asset_id IS NULL OR (d.decision = 'skip' AND d.session_id IS NOT $sessionId))
 `;
 
@@ -31,7 +33,8 @@ export async function getDeckItems(
   limit: number
 ): Promise<DeckItem[]> {
   return db.getAllAsync<DeckItem>(
-    `SELECT a.id, a.width, a.height, a.creation_time AS creationTime, a.filename
+    `SELECT a.id, a.media_type AS mediaType, a.duration, a.width, a.height,
+            a.creation_time AS creationTime, a.filename
      FROM assets a LEFT JOIN decisions d ON d.asset_id = a.id
      WHERE ${DECK_FILTER}
        AND a.id NOT IN (SELECT value FROM json_each($exclude))

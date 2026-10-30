@@ -17,6 +17,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import type { Decision, DeckItem } from '@/db/decisions';
+import { VideoLayer } from '@/features/deck/video-layer';
 import { useTheme } from '@/hooks/use-theme';
 
 const VELOCITY_THRESHOLD = 800;
@@ -34,6 +35,8 @@ type SwipeCardProps = {
   index: number;
   // 0 → 1 as the top card approaches a decision; drives the cards behind it.
   progress: SharedValue<number>;
+  // False while another screen covers the deck, so videos stop playing.
+  focused: boolean;
   // Set when this card was just undone, so it flies back in from where it left.
   enterFrom?: Decision;
   onSwiped: (item: DeckItem, decision: Decision) => void;
@@ -41,12 +44,13 @@ type SwipeCardProps = {
   ref?: Ref<SwipeCardHandle>;
 };
 
-export function SwipeCard({ item, index, progress, enterFrom, onSwiped, onOpen, ref }: SwipeCardProps) {
+export function SwipeCard({ item, index, progress, focused, enterFrom, onSwiped, onOpen, ref }: SwipeCardProps) {
   const theme = useTheme();
   const { width, height } = useWindowDimensions();
   const thresholdX = width * 0.3;
   const thresholdY = height * 0.15;
   const [showInfo, setShowInfo] = useState(false);
+  const isVideo = item.mediaType === 'video';
 
   const translateX = useSharedValue(enterFrom === 'keep' ? width * 1.5 : enterFrom === 'trash' ? -width * 1.5 : 0);
   const translateY = useSharedValue(enterFrom === 'skip' ? -height : 0);
@@ -154,8 +158,8 @@ export function SwipeCard({ item, index, progress, enterFrom, onSwiped, onOpen, 
         <Pressable
           style={StyleSheet.absoluteFill}
           accessibilityRole="imagebutton"
-          accessibilityLabel={`Photo from ${formatDate(item.creationTime)}`}
-          accessibilityHint="Opens the photo full screen. Long press for details."
+          accessibilityLabel={`${isVideo ? `Video, ${formatDuration(item.duration)}` : 'Photo'}, from ${formatDate(item.creationTime)}`}
+          accessibilityHint="Opens it full screen. Long press for details."
           onPress={() => onOpen(item)}
           onLongPress={() => setShowInfo((value) => !value)}>
           <Image
@@ -166,9 +170,17 @@ export function SwipeCard({ item, index, progress, enterFrom, onSwiped, onOpen, 
             transition={120}
             style={StyleSheet.absoluteFill}
           />
-          <View style={styles.footer}>
+          {isVideo && (
+            <VideoLayer
+              uri={item.id}
+              active={index === 0 && focused}
+              showSurface={index <= 1}
+              cardPan={pan}
+            />
+          )}
+          <View style={styles.footer} pointerEvents="none">
             <ThemedText type="smallBold" style={styles.onPhoto}>
-              {formatDate(item.creationTime)}
+              {isVideo ? `${formatDate(item.creationTime)} · ${formatDuration(item.duration)}` : formatDate(item.creationTime)}
             </ThemedText>
             {showInfo && (
               <ThemedText type="small" style={styles.onPhoto}>
@@ -204,6 +216,16 @@ function formatDate(ms: number | null) {
   return ms ? dateFormat.format(ms) : 'Unknown date';
 }
 
+function formatDuration(ms: number | null) {
+  if (!ms) return '0:00';
+  const total = Math.round(ms / 1000);
+  const minutes = Math.floor(total / 60);
+  const seconds = String(total % 60).padStart(2, '0');
+  return minutes >= 60
+    ? `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}:${seconds}`
+    : `${minutes}:${seconds}`;
+}
+
 const styles = StyleSheet.create({
   card: {
     ...StyleSheet.absoluteFill,
@@ -232,12 +254,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
   },
   stampLeft: {
-    top: Spacing.five,
+    top: Spacing.six,
     left: Spacing.four,
     transform: [{ rotate: '-12deg' }],
   },
   stampRight: {
-    top: Spacing.five,
+    top: Spacing.six,
     right: Spacing.four,
     transform: [{ rotate: '12deg' }],
   },

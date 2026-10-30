@@ -24,7 +24,7 @@ Tinder-style swiping through the device photo/video library to free up storage: 
 | iOS `getUri()` allows network access, so it would download iCloud-only assets | Always check `getIsInCloud()` before resolving a URI for size |
 | Limited access on iOS 14+ / Android 14+ | Banner + `presentPermissionsPicker()` |
 | Google Play restricts full photo/video access | File the Play Console declaration early |
-| `expo-video`: `replaceAsync` needed for iOS `ph://`; Android allows one `VideoView` per player | Pool of 2–3 players reused across cards |
+| `expo-video`: iOS `ph://` sources only load asynchronously (the `useVideoPlayer` constructor path is async, sync `replace` throws); Android allows one `VideoView` per player; a `SurfaceView` does not follow view transforms | One player per mounted video card (max 3); `surfaceType="textureView"` on Android |
 | Native modules | Development build required (`eas build --profile development`); Expo Go is insufficient |
 
 ## Stack
@@ -53,7 +53,7 @@ src/
     summary.tsx             # post-commit "Freed X GB"
   features/
     media/   indexer.ts, query-builder.ts, delete.ts, permissions.ts
-    deck/    swipe-deck.tsx, swipe-card.tsx, video-card.tsx, use-deck.ts, player-pool.ts
+    deck/    swipe-deck.tsx, swipe-card.tsx, video-layer.tsx, use-deck.ts
     filters/ types.ts, presets.ts, FilterSheet.tsx
     trash/   TrashGrid.tsx, useTrash.ts
   db/        schema.ts, migrations.ts, repo.ts
@@ -117,9 +117,12 @@ A single serializable `FilterSpec` maps to SQL `WHERE`/`ORDER BY`. It is stored 
 - All motion in Reanimated worklets, with threshold stamps and a haptic on crossing.
 
 **Video:**
-- Top card autoplays muted and looping; tap toggles sound.
-- Scrub bar uses `scrubbingModeOptions`. The next card preloads via `replaceAsync`.
-- Poster frame comes from `generateThumbnailsAsync`.
+- The deck now includes videos; photo/video filtering arrives in milestone 5.
+- Each mounted video card owns its own `useVideoPlayer` (so at most 3 players). This replaced the planned shared pool: it is simpler, and the card behind the top one is already buffered when it moves up.
+- Only the top card on a focused screen plays. The two top cards render a `VideoView`; the third only buffers. The surface fades in on `onFirstFrameRender` over the expo-image poster, which expo-image loads from the asset itself, so `generateThumbnailsAsync` is not needed.
+- Videos loop muted. The sound toggle is a session-wide preference.
+- The scrub bar `block`s the card's swipe pan and turns `scrubbingModeOptions` on only while dragging. Progress comes from `timeUpdate` events (every 0.25 s) into a shared value, so the bar never re-renders React.
+- The viewer plays videos full screen with native controls and sound.
 
 **Progress header:** count reviewed and bytes marked.
 
@@ -149,7 +152,7 @@ A single serializable `FilterSpec` maps to SQL `WHERE`/`ORDER BY`. It is stored 
 - [ ] **1. Index.** Permissions, SQLite schema/migrations, indexer fast pass. *Done when:* 10k+ assets indexed in under 3 s. *(Code done; on-device timing not yet verified. Home shows the asset-pass time.)*
 - [ ] **2. Photo deck.** keep/trash/skip, undo, persisted decisions. *Done when:* smooth on a mid-range Android. *(Code done, including a basic full-screen viewer; on-device smoothness not yet verified.)*
 - [ ] **3. Trash + commit.** Batch delete, cancel handling. *Done when:* real deletion works on both platforms. *(Code done; on-device deletion not yet verified.)*
-- [ ] **4. Video.** Video cards, player pool, scrub, mute. *Done when:* no dropped frames moving between video cards.
+- [ ] **4. Video.** Video cards, player pool, scrub, mute. *Done when:* no dropped frames moving between video cards. *(Code done; on-device frame rate and Android video posters not yet verified.)*
 - [ ] **5. Filters.** Filter/sort sheet, presets, size enrichment, sort by size. *Done when:* all filters work and the spec persists.
 - [ ] **6. Screens.** Home stats, Library grid with multi-select delete, Summary, Settings (reset kept). *Done when:* feature-complete MVP.
 - [ ] **7. Polish.** Haptics, dark mode, accessibility labels, empty and error states (iCloud, missing files). *Done when:* TestFlight / Play internal test.
