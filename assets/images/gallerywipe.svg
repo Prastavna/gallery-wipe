@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="512" height="512" role="img" aria-labelledby="t">
+  <title id="t">Gallerywipe icon</title>
+  <rect width="200" height="200" rx="46" fill="#111827"/>
+  <g transform="translate(112 100) rotate(12)">
+    <rect x="-36" y="-46" width="72" height="92" rx="10" fill="#FFFFFF"/>
+  </g>
+  <g fill="none" stroke="#2DD4BF" stroke-linecap="round" stroke-width="8">
+    <path d="M24 92 H50"/>
+    <path d="M32 112 H50" opacity="0.5"/>
+  </g>
+</svg>
