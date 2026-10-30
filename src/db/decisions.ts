@@ -125,3 +125,14 @@ export async function countDecisions(db: SQLiteDatabase): Promise<Record<Decisio
   for (const row of rows) counts[row.decision] = row.count;
   return counts;
 }
+
+/** Sends items to Trash outside any swipe session (e.g. from duplicate groups). */
+export async function markForDeletion(db: SQLiteDatabase, ids: string[]) {
+  await db.runAsync(
+    `INSERT INTO decisions (asset_id, decision, decided_at, session_id)
+     SELECT value, 'trash', $now, NULL FROM json_each($ids) WHERE true
+     ON CONFLICT (asset_id) DO UPDATE SET
+       decision = 'trash', decided_at = excluded.decided_at, session_id = NULL`,
+    { $ids: JSON.stringify(ids), $now: Date.now() }
+  );
+}

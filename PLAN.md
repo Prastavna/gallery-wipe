@@ -160,7 +160,7 @@ Migrations are an append-only list in `src/db/migrations.ts`, tracked with `PRAG
 - [ ] **5. Filters.** Filter/sort sheet, presets, size enrichment, sort by size. *Done when:* all filters work and the spec persists. *(Code done; every filter and sort verified against SQLite; on-device size measurement speed not yet verified.)*
 - [ ] **6. Screens.** Home stats, Library grid with multi-select delete, Summary, Settings (reset kept). *Done when:* feature-complete MVP. *(Code done; on-device grid scrolling on large libraries not yet verified.)*
 - [ ] **7. Polish.** Haptics, dark mode, accessibility labels, empty and error states (iCloud, missing files). *Done when:* TestFlight / Play internal test. *(Code done; needs store builds and on-device VoiceOver/TalkBack passes.)*
-- [ ] **8. Post-MVP.** Similar/duplicate detection, burst grouping, video compression offer, widgets.
+- [ ] **8. Post-MVP.** Duplicate detection and burst/similar-shot grouping. *(Code done; grouping verified against SQLite; on-device accuracy on real libraries not yet verified.)* Video compression and widgets are dropped for now, see Duplicates and similar shots.
 
 ## Library and Settings
 
@@ -195,6 +195,22 @@ Migrations are an append-only list in `src/db/migrations.ts`, tracked with `PRAG
   - A card, grid tile or viewer image that fails to load shows an explanation (deleted, or iCloud while offline) and stays swipeable; a deck card failure triggers a rescan to drop deleted items.
   - Videos that fail to play show an overlay. iCloud-only items say "iCloud" on the card, and the top card shows a spinner until its image loads.
   - A root `ErrorBoundary` replaces a blank screen with "Try again".
+
+## Duplicates and similar shots
+
+- **Duplicates** (`getDuplicateGroups`, `src/db/groups.ts`): assets with the same byte size, dimensions, media type and duration.
+  - Only measured assets can match, so groups appear as background size measurement runs; the empty state says how many are still unmeasured.
+  - Suggested keeper: a favorite, else the earliest copy.
+- **Similar shots** (`getSimilarGroups`): non-screenshot photos taken within 2 s of the previous one in the same orientation, found with SQL window functions (`LAG` + running `SUM`).
+  - Suggested keeper: a favorite, else the most pixels, then the largest file.
+  - This is a metadata heuristic, not perceptual hashing: Expo has no on-device image-hashing module, and decoding every photo in JS would be too slow.
+- **Screen** (`/groups`, a modal from a Home card that shows counts and reclaimable bytes):
+  - Duplicates / Similar tabs; each group shows thumbnails with a keep/delete badge. Tap toggles, long-press opens the viewer, and at least one item per group is always kept.
+  - "Delete" per group or "Apply all" marks the chosen items as `trash` decisions (`markForDeletion`). Nothing is deleted until the user confirms in Trash, so the existing OS-confirmation flow applies.
+  - Items already marked to delete drop out of the groups.
+- **Dropped:**
+  - Video compression: no Expo module transcodes video, and it would need a native dependency plus a dev-build-only code path.
+  - Home-screen widgets: they need native iOS widget extensions and Android app widgets, which are not worth it for this app.
 
 ## Risks
 

@@ -9,6 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { getLibraryStats, type LibraryStats } from '@/db/assets';
+import { getDuplicateGroups, getSimilarGroups, type MediaGroup } from '@/db/groups';
 import { getLifetime, type Lifetime } from '@/db/trash';
 import { describeFilters, PRESETS, type FilterSpec } from '@/features/filters/spec';
 import { useFilters } from '@/features/filters/store';
@@ -23,12 +24,16 @@ export default function HomeScreen() {
   const manageLimitedAccess = useMediaPermission((state) => state.manageLimitedAccess);
   const [stats, setStats] = useState<LibraryStats | null>(null);
   const [lifetime, setLifetime] = useState<Lifetime | null>(null);
+  const [groups, setGroups] = useState<{ duplicates: MediaGroup[]; similar: MediaGroup[] } | null>(null);
   const filters = useFilters((state) => state.spec);
   const applyFilters = useFilters((state) => state.apply);
 
   const refreshStats = useCallback(() => {
     getLibraryStats(db).then(setStats);
     getLifetime(db).then(setLifetime);
+    Promise.all([getDuplicateGroups(db), getSimilarGroups(db)]).then(([duplicates, similar]) =>
+      setGroups({ duplicates, similar })
+    );
   }, [db]);
   // On focus, so counts reflect decisions made in the swipe deck; and after each scan.
   useFocusEffect(refreshStats);
@@ -96,6 +101,20 @@ export default function HomeScreen() {
               variant="secondary"
               onPress={() => router.push('/trash')}
             />
+          )}
+
+          {!!groups && groups.duplicates.length + groups.similar.length > 0 && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/groups')}
+              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+              <ThemedView type="backgroundElement" style={styles.card}>
+                <ThemedText type="smallBold">Duplicates & similar shots</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {describeGroups(groups.duplicates, groups.similar)}
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
           )}
 
           {!!lifetime?.bytes && (
@@ -167,6 +186,13 @@ function Stat({ label, value }: { label: string; value: number | undefined }) {
   );
 }
 
+function describeGroups(duplicates: MediaGroup[], similar: MediaGroup[]) {
+  const parts = [];
+  if (duplicates.length) parts.push(`${numberFormat.format(duplicates.length)} sets of duplicates`);
+  if (similar.length) parts.push(`${numberFormat.format(similar.length)} bursts of similar photos`);
+  const bytes = [...duplicates, ...similar].reduce((sum, group) => sum + group.reclaimableBytes, 0);
+  return `${parts.join(', ')}${bytes ? ` · up to ${formatBytes(bytes)} to free` : ''}. Keep the best, clear the rest.`;
+}
 
 const styles = StyleSheet.create({
   container: {

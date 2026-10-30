@@ -69,6 +69,7 @@ function RootStack() {
         <Stack.Screen name="swipe" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
         <Stack.Screen name="viewer/[id]" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
         <Stack.Screen name="trash" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="groups" options={{ presentation: 'modal' }} />
         <Stack.Screen
           name="filters"
           options={{ presentation: 'formSheet', sheetAllowedDetents: [0.85, 1], sheetGrabberVisible: true }}
