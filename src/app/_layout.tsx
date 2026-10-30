@@ -1,21 +1,39 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { AppState, useColorScheme } from 'react-native';
+import { AppState, StyleSheet, useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { Button } from '@/components/button';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Colors, Spacing } from '@/constants/theme';
 import { migrateDbIfNeeded } from '@/db/migrations';
 import { hasLibraryAccess, useMediaPermission } from '@/features/media/permissions';
 
 SplashScreen.preventAutoHideAsync();
 
+// Navigation chrome (screen and sheet backgrounds, borders) in the app's own palette.
+const NAVIGATION_THEMES = {
+  light: {
+    ...DefaultTheme,
+    colors: { ...DefaultTheme.colors, background: Colors.light.background, card: Colors.light.background, text: Colors.light.text },
+  },
+  dark: {
+    ...DarkTheme,
+    colors: { ...DarkTheme.colors, background: Colors.dark.background, card: Colors.dark.background, text: Colors.dark.text },
+  },
+};
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <GestureHandlerRootView style={styles.flex}>
+      <ThemeProvider value={NAVIGATION_THEMES[colorScheme === 'dark' ? 'dark' : 'light']}>
+        <StatusBar style="auto" />
         <SQLiteProvider databaseName="gallery-wipe.db" onInit={migrateDbIfNeeded}>
           <RootStack />
         </SQLiteProvider>
@@ -63,3 +81,33 @@ function RootStack() {
     </Stack>
   );
 }
+
+// Last-resort screen for a render error anywhere below the root, instead of a blank app.
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <ThemedView style={styles.flex}>
+      <View style={styles.errorContent}>
+        <ThemedText type="subtitle">Something went wrong</ThemedText>
+        <ThemedText themeColor="textSecondary">
+          Nothing was deleted. Your decisions so far are saved.
+        </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {error.message}
+        </ThemedText>
+        <Button title="Try again" onPress={retry} />
+      </View>
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+  errorContent: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: Spacing.three,
+    padding: Spacing.four,
+  },
+});

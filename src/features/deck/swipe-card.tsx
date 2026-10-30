@@ -1,12 +1,13 @@
 import { Image } from 'expo-image';
-import * as Haptics from 'expo-haptics';
+import { SymbolView } from 'expo-symbols';
 import { useEffect, useImperativeHandle, useState, type Ref } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   Extrapolation,
   interpolate,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withSpring,
   withTiming,
@@ -18,10 +19,12 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import type { Decision, DeckItem } from '@/db/decisions';
 import { VideoLayer } from '@/features/deck/video-layer';
+import { haptic } from '@/features/preferences';
 import { useTheme } from '@/hooks/use-theme';
 
 const VELOCITY_THRESHOLD = 800;
 const FLY_OUT_MS = 220;
+const REDUCED_FLY_OUT_MS = 120;
 const MAX_ROTATION_DEG = 12;
 const SPRING = { damping: 18, stiffness: 180 };
 
@@ -41,16 +44,40 @@ type SwipeCardProps = {
   enterFrom?: Decision;
   onSwiped: (item: DeckItem, decision: Decision) => void;
   onOpen: (item: DeckItem) => void;
+  // The image could not be loaded (deleted elsewhere, unreadable, offline iCloud item).
+  onBroken: (item: DeckItem) => void;
   ref?: Ref<SwipeCardHandle>;
 };
 
-export function SwipeCard({ item, index, progress, focused, enterFrom, onSwiped, onOpen, ref }: SwipeCardProps) {
+const ACCESSIBILITY_ACTIONS = [
+  { name: 'keep', label: 'Keep' },
+  { name: 'trash', label: 'Delete' },
+  { name: 'skip', label: 'Decide later' },
+];
+
+export function SwipeCard({
+  item,
+  index,
+  progress,
+  focused,
+  enterFrom,
+  onSwiped,
+  onOpen,
+  onBroken,
+  ref,
+}: SwipeCardProps) {
   const theme = useTheme();
   const { width, height } = useWindowDimensions();
   const thresholdX = width * 0.3;
   const thresholdY = height * 0.15;
   const [showInfo, setShowInfo] = useState(false);
+  const [image, setImage] = useState<'loading' | 'loaded' | 'broken'>('loading');
   const isVideo = item.mediaType === 'video';
+  const isTop = index === 0;
+  // Reduced motion: no tilt and a quicker exit.
+  const reduceMotion = useReducedMotion();
+  const flyOutMs = reduceMotion ? REDUCED_FLY_OUT_MS : FLY_OUT_MS;
+  const maxRotation = reduceMotion ? 0 : MAX_ROTATION_DEG;
 
   const translateX = useSharedValue(enterFrom === 'keep' ? width * 1.5 : enterFrom === 'trash' ? -width * 1.5 : 0);
   const translateY = useSharedValue(enterFrom === 'skip' ? -height : 0);
@@ -67,24 +94,24 @@ export function SwipeCard({ item, index, progress, focused, enterFrom, onSwiped,
     'worklet';
     if (leaving.get()) return;
     leaving.set(true);
-    progress.set(withTiming(1, { duration: FLY_OUT_MS }));
+    progress.set(withTiming(1, { duration: flyOutMs }));
     const onDone = (finished?: boolean) => {
       'worklet';
       if (finished) scheduleOnRN(onSwiped, item, decision);
     };
     if (decision === 'skip') {
-      translateY.set(withTiming(-height * 1.2, { duration: FLY_OUT_MS }, onDone));
+      translateY.set(withTiming(-height * 1.2, { duration: flyOutMs }, onDone));
     } else {
       const direction = decision === 'keep' ? 1 : -1;
-      translateX.set(withTiming(direction * width * 1.5, { duration: FLY_OUT_MS }, onDone));
-      translateY.set(withTiming(translateY.get() + 40, { duration: FLY_OUT_MS }));
+      translateX.set(withTiming(direction * width * 1.5, { duration: flyOutMs }, onDone));
+      translateY.set(withTiming(translateY.get() + 40, { duration: flyOutMs }));
     }
   }
 
   useImperativeHandle(ref, () => ({ swipe: (decision) => flyOut(decision) }));
 
   const pan = usePanGesture({
-    enabled: index === 0,
+    enabled: isTop,
     onUpdate: (event) => {
       'worklet';
       if (leaving.get()) return;
@@ -95,7 +122,7 @@ export function SwipeCard({ item, index, progress, focused, enterFrom, onSwiped,
       const isArmed = reach >= 1;
       if (isArmed !== armed.get()) {
         armed.set(isArmed);
-        if (isArmed) scheduleOnRN(Haptics.selectionAsync);
+        if (isArmed) scheduleOnRN(haptic.selection);
       }
     },
     onDeactivate: (event) => {
@@ -118,8 +145,8 @@ export function SwipeCard({ item, index, progress, focused, enterFrom, onSwiped,
   });
 
   const cardStyle = useAnimatedStyle(() => {
-    if (index === 0) {
-      const rotate = interpolate(translateX.get(), [-width, 0, width], [-MAX_ROTATION_DEG, 0, MAX_ROTATION_DEG]);
+    if (isTop) {
+      const rotate = interpolate(translateX.get(), [-width, 0, width], [-maxRotation, 0, maxRotation]);
       return {
         transform: [
           { translateX: translateX.get() },
@@ -154,12 +181,24 @@ export function SwipeCard({ item, index, progress, focused, enterFrom, onSwiped,
     <GestureDetector gesture={pan}>
       <Animated.View
         style={[styles.card, { backgroundColor: theme.backgroundElement }, cardStyle]}
-        pointerEvents={index === 0 ? 'auto' : 'none'}>
+        pointerEvents={isTop ? 'auto' : 'none'}
+        // Screen readers should only meet the top card.
+        accessibilityElementsHidden={!isTop}
+        importantForAccessibility={isTop ? 'auto' : 'no-hide-descendants'}>
         <Pressable
           style={StyleSheet.absoluteFill}
           accessibilityRole="imagebutton"
-          accessibilityLabel={`${isVideo ? `Video, ${formatDuration(item.duration)}` : 'Photo'}, from ${formatDate(item.creationTime)}`}
-          accessibilityHint="Opens it full screen. Long press for details."
+          accessibilityLabel={[
+            isVideo ? `Video, ${formatDuration(item.duration)}` : 'Photo',
+            `from ${formatDate(item.creationTime)}`,
+            item.inCloud ? 'stored in iCloud' : null,
+            image === 'broken' ? 'could not be loaded' : null,
+          ]
+            .filter(Boolean)
+            .join(', ')}
+          accessibilityHint="Opens it full screen. Use actions to keep, delete or decide later."
+          accessibilityActions={ACCESSIBILITY_ACTIONS}
+          onAccessibilityAction={(event) => flyOut(event.nativeEvent.actionName as Decision)}
           onPress={() => onOpen(item)}
           onLongPress={() => setShowInfo((value) => !value)}>
           <Image
@@ -167,20 +206,44 @@ export function SwipeCard({ item, index, progress, focused, enterFrom, onSwiped,
             recyclingKey={item.id}
             cachePolicy="memory"
             contentFit="cover"
-            transition={120}
+            transition={reduceMotion ? 0 : 120}
+            onLoad={() => setImage('loaded')}
+            onError={() => {
+              setImage('broken');
+              onBroken(item);
+            }}
             style={StyleSheet.absoluteFill}
           />
+          {image === 'loading' && isTop && <ActivityIndicator style={styles.center} color={theme.textSecondary} />}
+          {image === 'broken' && (
+            <View style={styles.center} pointerEvents="none">
+              <SymbolView
+                name={{ ios: 'exclamationmark.triangle', android: 'broken_image' }}
+                size={32}
+                tintColor={theme.textSecondary}
+              />
+              <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>
+                {'Can’t load this item. It may have been deleted, or it’s in iCloud and you’re offline. You can still swipe it.'}
+              </ThemedText>
+            </View>
+          )}
           {isVideo && (
             <VideoLayer
               uri={item.id}
-              active={index === 0 && focused}
+              active={isTop && focused}
               showSurface={index <= 1}
               cardPan={pan}
             />
           )}
           <View style={styles.footer} pointerEvents="none">
             <ThemedText type="smallBold" style={styles.onPhoto}>
-              {isVideo ? `${formatDate(item.creationTime)} · ${formatDuration(item.duration)}` : formatDate(item.creationTime)}
+              {[
+                formatDate(item.creationTime),
+                isVideo ? formatDuration(item.duration) : null,
+                item.inCloud ? 'iCloud' : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </ThemedText>
             {showInfo && (
               <ThemedText type="small" style={styles.onPhoto}>
@@ -232,6 +295,16 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.four,
     borderCurve: 'continuous',
     overflow: 'hidden',
+  },
+  center: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    padding: Spacing.five,
+  },
+  centerText: {
+    textAlign: 'center',
   },
   footer: {
     position: 'absolute',

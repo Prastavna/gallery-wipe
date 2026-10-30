@@ -27,7 +27,8 @@ type HistoryEntry = {
   previous: Promise<DecisionRecord | null>;
 };
 
-export type DeckStatus = 'loading' | 'ready' | 'done';
+// 'empty': nothing matched the filters at all; 'done': everything matching has been decided.
+export type DeckStatus = 'loading' | 'empty' | 'ready' | 'done';
 
 const EMPTY_COUNTS: Record<Decision, number> = { keep: 0, trash: 0, skip: 0 };
 
@@ -48,6 +49,7 @@ export function useDeck(initialSpec: FilterSpec) {
   const [remaining, setRemaining] = useState(0);
   const [exhausted, setExhausted] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [matched, setMatched] = useState(0);
   // The most recently undone item, so its card can fly back in from where it left.
   const [restored, setRestored] = useState<{ id: string; decision: Decision } | null>(null);
   const writes = useRef<Promise<unknown>>(Promise.resolve());
@@ -79,6 +81,7 @@ export function useDeck(initialSpec: FilterSpec) {
       ]);
       if (cancelled) return;
       setSession({ id, query });
+      setMatched(total);
       setRemaining(spec.limit ? Math.min(total, spec.limit) : total);
       setQueue(items);
       setExhausted(items.length < firstPage);
@@ -163,8 +166,13 @@ export function useDeck(initialSpec: FilterSpec) {
     });
   }, [db, enqueue]);
 
-  const status: DeckStatus =
-    loading ? 'loading' : queue.length === 0 && (exhausted || limitReached) ? 'done' : 'ready';
+  const status: DeckStatus = loading
+    ? 'loading'
+    : matched === 0
+      ? 'empty'
+      : queue.length === 0 && (exhausted || limitReached)
+        ? 'done'
+        : 'ready';
 
   return {
     status,

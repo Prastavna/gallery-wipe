@@ -21,6 +21,7 @@ import { Spacing } from '@/constants/theme';
 import { getTrashItems, restoreFromTrash, type TrashItem } from '@/db/trash';
 import { requestScan } from '@/features/media/indexer';
 import { fillMissingSizes } from '@/features/media/sizes';
+import { haptic } from '@/features/preferences';
 import { confirmDeletion, deleteAssets } from '@/features/trash/delete-assets';
 import { useTheme } from '@/hooks/use-theme';
 import { formatBytes, numberFormat } from '@/utils/format';
@@ -63,6 +64,7 @@ export default function TrashScreen() {
   const unknownSizes = items?.filter((item) => item.size === null).length ?? 0;
 
   function toggle(id: string) {
+    haptic.selection();
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
@@ -87,6 +89,7 @@ export default function TrashScreen() {
     requestScan(db);
 
     if (result.deleted === 0) {
+      haptic.warning();
       setNotice('Nothing was deleted. Your items are still here.');
       return;
     }

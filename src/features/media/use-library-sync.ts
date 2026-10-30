@@ -6,6 +6,7 @@ import { AppState } from 'react-native';
 import { useFilters } from '@/features/filters/store';
 import { loadLastScan, requestScan } from '@/features/media/indexer';
 import { startSizeEnrichment, stopSizeEnrichment } from '@/features/media/size-enrichment';
+import { usePreferences } from '@/features/preferences';
 
 const CHANGE_DEBOUNCE_MS = 1000;
 
@@ -23,6 +24,7 @@ export function useLibrarySync() {
     const sync = () => requestScan(db).then(() => startSizeEnrichment(db));
 
     useFilters.getState().load(db);
+    usePreferences.getState().load(db);
     loadLastScan(db).then(sync);
 
     const changes = addListener(() => {

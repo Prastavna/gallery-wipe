@@ -7,7 +7,10 @@
     "icon": "./assets/images/icon.png",
     "scheme": "gallerywipe",
     "userInterfaceStyle": "automatic",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.prastavna.gallerywipe",
@@ -30,7 +33,11 @@
         {
           "backgroundColor": "#208AEF",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 76,
+          "dark": {
+            "backgroundColor": "#000000",
+            "image": "./assets/images/splash-icon.png"
+          }
         }
       ],
       [
@@ -38,7 +45,10 @@
         {
           "photosPermission": "Gallery Wipe needs access to your photos and videos so you can review them and delete the ones you no longer want.",
           "savePhotosPermission": "Gallery Wipe needs permission to modify your library so it can delete the items you choose.",
-          "granularPermissions": ["photo", "video"]
+          "granularPermissions": [
+            "photo",
+            "video"
+          ]
         }
       ],
       "expo-video",

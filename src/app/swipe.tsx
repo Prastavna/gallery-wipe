@@ -1,8 +1,8 @@
-import * as Haptics from 'expo-haptics';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { useCallback, useRef } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
@@ -15,6 +15,8 @@ import { SwipeDeck } from '@/features/deck/swipe-deck';
 import { useDeck } from '@/features/deck/use-deck';
 import { describeFilters } from '@/features/filters/spec';
 import { useFilters } from '@/features/filters/store';
+import { requestScan } from '@/features/media/indexer';
+import { haptic } from '@/features/preferences';
 import { useTheme } from '@/hooks/use-theme';
 import { formatBytes, numberFormat } from '@/utils/format';
 
@@ -22,7 +24,14 @@ import { formatBytes, numberFormat } from '@/utils/format';
 const REVIEW_PROMPT_EVERY_ITEMS = 50;
 const REVIEW_PROMPT_EVERY_BYTES = 1_000_000_000;
 
+const ANNOUNCEMENTS: Record<Decision, string> = {
+  keep: 'Kept',
+  trash: 'Marked to delete',
+  skip: 'Saved for later',
+};
+
 export default function SwipeScreen() {
+  const db = useSQLiteContext();
   const theme = useTheme();
   const deck = useDeck(useFilters((state) => state.spec));
   const topCard = useRef<SwipeCardHandle>(null);
@@ -33,7 +42,9 @@ export default function SwipeScreen() {
   useFocusEffect(useCallback(() => prune(), [prune]));
 
   function onSwiped(item: DeckItem, decision: Decision) {
-    Haptics.impactAsync(decision === 'trash' ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
+    if (decision === 'trash') haptic.medium();
+    else haptic.light();
+    AccessibilityInfo.announceForAccessibility(ANNOUNCEMENTS[decision]);
     deck.decide(item, decision);
     if (decision !== 'trash') return;
     const trashed = deck.counts.trash + 1;
@@ -47,6 +58,16 @@ export default function SwipeScreen() {
         { text: 'Review', onPress: () => router.push('/trash') },
       ]);
     }
+  }
+
+  function onUndo() {
+    deck.undo();
+    AccessibilityInfo.announceForAccessibility('Undone');
+  }
+
+  // A file that will not load was probably deleted outside the app; a rescan drops it from the index.
+  function onBroken() {
+    requestScan(db);
   }
 
   function onOpen(item: DeckItem) {
@@ -87,6 +108,16 @@ export default function SwipeScreen() {
         <View style={styles.deckArea}>
           {deck.status === 'loading' ? (
             <ActivityIndicator style={styles.fill} />
+          ) : deck.status === 'empty' ? (
+            <View style={[styles.fill, styles.done]}>
+              <ThemedText type="subtitle" style={styles.centerText}>
+                Nothing matches
+              </ThemedText>
+              <ThemedText themeColor="textSecondary" style={styles.centerText}>
+                {`No items fit “${describeFilters(deck.spec)}”.`}
+              </ThemedText>
+              <Button title="Change filters" onPress={() => router.replace('/filters')} />
+            </View>
           ) : deck.status === 'done' ? (
             <View style={[styles.fill, styles.done]}>
               <ThemedText type="subtitle">All caught up</ThemedText>
@@ -102,6 +133,7 @@ export default function SwipeScreen() {
               focused={focused}
               onSwiped={onSwiped}
               onOpen={onOpen}
+              onBroken={onBroken}
               topCardRef={topCard}
             />
           )}
@@ -112,7 +144,7 @@ export default function SwipeScreen() {
             label="Undo"
             name={{ ios: 'arrow.uturn.backward', android: 'undo' }}
             disabled={!deck.canUndo}
-            onPress={deck.undo}
+            onPress={onUndo}
           />
           <IconButton
             label="Delete"

@@ -19,6 +19,8 @@ export type DeckItem = {
   height: number | null;
   // Bytes, once measured.
   size: number | null;
+  // 1 when iOS reported the original as iCloud-only (it downloads on display).
+  inCloud: number | null;
   creationTime: number | null;
   filename: string | null;
 };
@@ -32,7 +34,7 @@ export async function getDeckItems(
   limit: number
 ): Promise<DeckItem[]> {
   return db.getAllAsync<DeckItem>(
-    `SELECT a.id, a.media_type AS mediaType, a.duration, a.width, a.height, a.size,
+    `SELECT a.id, a.media_type AS mediaType, a.duration, a.width, a.height, a.size, a.in_cloud AS inCloud,
             a.creation_time AS creationTime, a.filename
      FROM assets a LEFT JOIN decisions d ON d.asset_id = a.id
      WHERE ${query.where}

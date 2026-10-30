@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState, type ReactNode } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
@@ -13,6 +13,7 @@ import { clearDecisions, countDecisions, type Decision } from '@/db/decisions';
 import { getLifetime, type Lifetime } from '@/db/trash';
 import { requestScan, useIndexStatus } from '@/features/media/indexer';
 import { useMediaPermission } from '@/features/media/permissions';
+import { usePreferences } from '@/features/preferences';
 import { formatBytes, numberFormat } from '@/utils/format';
 
 export default function SettingsScreen() {
@@ -22,6 +23,8 @@ export default function SettingsScreen() {
   const { scanning, scanned, lastScan, error } = useIndexStatus();
   const [counts, setCounts] = useState<Record<Decision, number> | null>(null);
   const [lifetime, setLifetime] = useState<Lifetime | null>(null);
+  const haptics = usePreferences((state) => state.haptics);
+  const setPreferences = usePreferences((state) => state.set);
 
   const refresh = useCallback(() => {
     countDecisions(db).then(setCounts);
@@ -104,6 +107,20 @@ export default function SettingsScreen() {
                       'Empty'
                     )
                   }
+                />
+              }
+            />
+          </Section>
+
+          <Section title="Feedback">
+            <Row
+              label="Haptics"
+              detail="A tap when a swipe will count, and on keep and delete."
+              action={
+                <Switch
+                  value={haptics}
+                  onValueChange={(value) => setPreferences(db, { haptics: value })}
+                  accessibilityLabel="Haptics"
                 />
               }
             />

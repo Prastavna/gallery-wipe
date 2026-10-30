@@ -115,6 +115,17 @@ export default function HomeScreen() {
             </ThemedView>
           )}
 
+          {stats?.total === 0 && !scanning && (
+            <ThemedView type="backgroundElement" style={styles.card}>
+              <ThemedText type="smallBold">No photos or videos found</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {limited
+                  ? 'You haven’t shared any photos with Gallery Wipe yet. Use Manage access above.'
+                  : 'Your library looks empty. New photos and videos will show up here automatically.'}
+              </ThemedText>
+            </ThemedView>
+          )}
+
           <ThemedView style={styles.grid}>
             <Stat label="Items" value={stats?.total} />
             <Stat label="Photos" value={stats?.photos} />
@@ -143,7 +154,11 @@ export default function HomeScreen() {
 
 function Stat({ label, value }: { label: string; value: number | undefined }) {
   return (
-    <ThemedView type="backgroundElement" style={styles.stat}>
+    <ThemedView
+      type="backgroundElement"
+      style={styles.stat}
+      accessible
+      accessibilityLabel={`${label}: ${value === undefined ? 'loading' : numberFormat.format(value)}`}>
       <ThemedText type="subtitle">{value === undefined ? '–' : numberFormat.format(value)}</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
         {label}

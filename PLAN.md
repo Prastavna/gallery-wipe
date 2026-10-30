@@ -159,7 +159,7 @@ Migrations are an append-only list in `src/db/migrations.ts`, tracked with `PRAG
 - [ ] **4. Video.** Video cards, player pool, scrub, mute. *Done when:* no dropped frames moving between video cards. *(Code done; on-device frame rate and Android video posters not yet verified.)*
 - [ ] **5. Filters.** Filter/sort sheet, presets, size enrichment, sort by size. *Done when:* all filters work and the spec persists. *(Code done; every filter and sort verified against SQLite; on-device size measurement speed not yet verified.)*
 - [ ] **6. Screens.** Home stats, Library grid with multi-select delete, Summary, Settings (reset kept). *Done when:* feature-complete MVP. *(Code done; on-device grid scrolling on large libraries not yet verified.)*
-- [ ] **7. Polish.** Haptics, dark mode, accessibility labels, empty and error states (iCloud, missing files). *Done when:* TestFlight / Play internal test.
+- [ ] **7. Polish.** Haptics, dark mode, accessibility labels, empty and error states (iCloud, missing files). *Done when:* TestFlight / Play internal test. *(Code done; needs store builds and on-device VoiceOver/TalkBack passes.)*
 - [ ] **8. Post-MVP.** Similar/duplicate detection, burst grouping, video compression offer, widgets.
 
 ## Library and Settings
@@ -174,6 +174,27 @@ Migrations are an append-only list in `src/db/migrations.ts`, tracked with `PRAG
   - Index status with Rescan. The scan timings moved here from Home.
   - Lifetime freed, a privacy note, and the app version.
 - `confirmDeletion()` (`src/features/trash/delete-assets.ts`) is shared by Trash and Library: it is a no-op where the OS confirms itself and an in-app alert on Android 10 and older.
+
+## Polish
+
+- **Haptics:** `haptic` (`src/features/preferences.ts`) respects a Settings toggle stored in `settings`.
+  - Selection tick: swipe threshold, toggling grid selections.
+  - Light/medium impact: keep/later vs delete.
+  - Success: summary. Warning: deletion cancelled.
+- **Dark mode:** navigation themes use the app palette; `StatusBar style="auto"` (light in the viewer); dark splash background. Hardcoded colors are only white-on-scrim overlays on photos and the always-black viewer.
+- **Accessibility:**
+  - The top card exposes Keep / Delete / Decide later as accessibility actions; cards behind it are hidden from screen readers.
+  - Decisions and undo are announced.
+  - Reduced motion removes the tilt and shortens the exit animation.
+  - The scrub bar is adjustable (±10%). Home stats are single labelled elements.
+- **Empty states:**
+  - Deck: "Nothing matches" (with Change filters) vs "All caught up".
+  - Home: empty library / nothing shared under limited access.
+  - Trash and Library: their own empty messages.
+- **Error states:**
+  - A card, grid tile or viewer image that fails to load shows an explanation (deleted, or iCloud while offline) and stays swipeable; a deck card failure triggers a rescan to drop deleted items.
+  - Videos that fail to play show an overlay. iCloud-only items say "iCloud" on the card, and the top card shows a spinner until its image loads.
+  - A root `ErrorBoundary` replaces a blank screen with "Try again".
 
 ## Risks
 

@@ -15,6 +15,7 @@ import { getLibraryPage, type LibraryItem } from '@/db/library';
 import { buildDeckQuery, NO_SESSION } from '@/features/filters/query';
 import { DEFAULT_FILTERS, type MediaFilter, type SortKey } from '@/features/filters/spec';
 import { requestScan, useIndexStatus } from '@/features/media/indexer';
+import { haptic } from '@/features/preferences';
 import { confirmDeletion, deleteAssets } from '@/features/trash/delete-assets';
 import { useTheme } from '@/hooks/use-theme';
 import { formatBytes, numberFormat } from '@/utils/format';
@@ -86,6 +87,7 @@ export default function LibraryScreen() {
   }
 
   function toggle(id: string) {
+    haptic.selection();
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
@@ -105,7 +107,10 @@ export default function LibraryScreen() {
     setDeleting(true);
     const result = await deleteAssets(db, ids);
     setDeleting(false);
-    if (result.deleted === 0) return;
+    if (result.deleted === 0) {
+      haptic.warning();
+      return;
+    }
     endSelection();
     await requestScan(db);
     router.push({
@@ -202,9 +207,11 @@ type TileProps = {
 
 function Tile({ item, size, selecting, selected, showSize, onPress, onLongPress }: TileProps) {
   const theme = useTheme();
+  const [broken, setBroken] = useState(false);
   const isVideo = item.mediaType === 'video';
   const label = [
     isVideo ? 'Video' : 'Photo',
+    broken ? 'could not be loaded' : null,
     item.decision === 'keep' ? 'kept' : item.decision === 'trash' ? 'marked to delete' : null,
   ]
     .filter(Boolean)
@@ -223,8 +230,18 @@ function Tile({ item, size, selecting, selected, showSize, onPress, onLongPress 
         recyclingKey={item.id}
         cachePolicy="memory"
         contentFit="cover"
+        onError={() => setBroken(true)}
         style={StyleSheet.absoluteFill}
       />
+      {broken && (
+        <View style={styles.brokenTile} pointerEvents="none">
+          <SymbolView
+            name={{ ios: 'exclamationmark.triangle', android: 'broken_image' }}
+            size={20}
+            tintColor={theme.textSecondary}
+          />
+        </View>
+      )}
       <View style={styles.badges} pointerEvents="none">
         {item.decision === 'keep' && (
           <SymbolView name={{ ios: 'heart.fill', android: 'favorite' }} size={14} tintColor="#ffffff" />
@@ -287,6 +304,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.one,
+  },
+  brokenTile: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   spacer: {
     flex: 1,

@@ -14,10 +14,11 @@ type SwipeDeckProps = {
   focused: boolean;
   onSwiped: (item: DeckItem, decision: Decision) => void;
   onOpen: (item: DeckItem) => void;
+  onBroken: (item: DeckItem) => void;
   topCardRef: Ref<SwipeCardHandle>;
 };
 
-export function SwipeDeck({ queue, restored, focused, onSwiped, onOpen, topCardRef }: SwipeDeckProps) {
+export function SwipeDeck({ queue, restored, focused, onSwiped, onOpen, onBroken, topCardRef }: SwipeDeckProps) {
   const progress = useSharedValue(0);
   const topId = queue[0]?.id;
 
@@ -49,6 +50,7 @@ export function SwipeDeck({ queue, restored, focused, onSwiped, onOpen, topCardR
             enterFrom={restored?.id === item.id ? restored.decision : undefined}
             onSwiped={onSwiped}
             onOpen={onOpen}
+            onBroken={onBroken}
           />
         ))
         .reverse()}

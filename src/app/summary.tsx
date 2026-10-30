@@ -9,6 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { getLifetime, type Lifetime } from '@/db/trash';
+import { haptic } from '@/features/preferences';
 import { formatBytes, numberFormat } from '@/utils/format';
 
 export default function SummaryScreen() {
@@ -20,6 +21,7 @@ export default function SummaryScreen() {
   const [lifetime, setLifetime] = useState<Lifetime | null>(null);
 
   useEffect(() => {
+    haptic.success();
     getLifetime(db).then(setLifetime);
   }, [db]);
 

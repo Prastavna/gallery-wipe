@@ -7,9 +7,12 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from '
 import { SymbolView } from 'expo-symbols';
 import { create } from 'zustand';
 
+import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 
 const TIME_UPDATE_INTERVAL_S = 0.25;
+// Screen reader increment/decrement on the scrub bar.
+const ACCESSIBLE_SEEK_FRACTION = 0.1;
 
 // Sound preference for deck previews; starts muted and lasts for the app session.
 export const useVideoSound = create<{ muted: boolean; toggle: () => void }>((set) => ({
@@ -36,6 +39,7 @@ export function VideoLayer({ uri, active, showSurface, cardPan }: VideoLayerProp
   const muted = useVideoSound((state) => state.muted);
   const toggleSound = useVideoSound((state) => state.toggle);
   const [firstFrame, setFirstFrame] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [barWidth, setBarWidth] = useState(0);
   const fraction = useSharedValue(0);
   const scrubbing = useSharedValue(false);
@@ -53,6 +57,10 @@ export function VideoLayer({ uri, active, showSurface, cardPan }: VideoLayerProp
     else player.pause();
   }, [player, active]);
 
+  useEventListener(player, 'statusChange', ({ status }) => {
+    setFailed(status === 'error');
+  });
+
   useEventListener(player, 'timeUpdate', ({ currentTime }) => {
     if (scrubbing.get() || !player.duration) return;
     const next = currentTime / player.duration;
@@ -60,11 +68,15 @@ export function VideoLayer({ uri, active, showSurface, cardPan }: VideoLayerProp
     fraction.set(next < fraction.get() ? next : withTiming(next, { duration: TIME_UPDATE_INTERVAL_S * 1000, easing: Easing.linear }));
   });
 
-  function seekTo(x: number) {
-    if (!barWidth || !player.duration) return;
-    const next = Math.min(1, Math.max(0, x / barWidth));
+  function seekToFraction(value: number) {
+    if (!player.duration) return;
+    const next = Math.min(1, Math.max(0, value));
     fraction.set(next);
     configure(player, { currentTime: next * player.duration });
+  }
+
+  function seekTo(x: number) {
+    if (barWidth) seekToFraction(x / barWidth);
   }
 
   const scrub = usePanGesture({
@@ -103,14 +115,30 @@ export function VideoLayer({ uri, active, showSurface, cardPan }: VideoLayerProp
         />
       )}
 
-      {active && (
+      {failed && (
+        <View style={styles.error} pointerEvents="none">
+          <ThemedText type="small" style={styles.errorText}>
+            {'Can’t play this video. You can still swipe it.'}
+          </ThemedText>
+        </View>
+      )}
+
+      {active && !failed && (
         <View style={styles.controls} pointerEvents="box-none">
           <GestureDetector gesture={scrub}>
             <View
               style={styles.scrubArea}
               onLayout={(event: LayoutChangeEvent) => setBarWidth(event.nativeEvent.layout.width)}
               accessibilityRole="adjustable"
-              accessibilityLabel="Playback position">
+              accessibilityLabel="Playback position"
+              accessibilityValue={{ min: 0, max: 100, now: Math.round(fraction.get() * 100) }}
+              accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+              onAccessibilityAction={(event) =>
+                seekToFraction(
+                  fraction.get() +
+                    (event.nativeEvent.actionName === 'increment' ? ACCESSIBLE_SEEK_FRACTION : -ACCESSIBLE_SEEK_FRACTION)
+                )
+              }>
               <View style={styles.track}>
                 <Animated.View style={[styles.fill, progressStyle]} />
               </View>
@@ -167,6 +195,19 @@ const styles = StyleSheet.create({
   fill: {
     height: '100%',
     backgroundColor: '#ffffff',
+  },
+  error: {
+    position: 'absolute',
+    top: Spacing.three,
+    left: Spacing.three,
+    right: Spacing.three,
+    padding: Spacing.two,
+    borderRadius: Spacing.two,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+  },
+  errorText: {
+    color: '#ffffff',
+    textAlign: 'center',
   },
   soundButton: {
     alignItems: 'center',

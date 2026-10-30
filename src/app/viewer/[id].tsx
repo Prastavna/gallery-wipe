@@ -1,19 +1,35 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ViewerScreen() {
   const { id, mediaType } = useLocalSearchParams<{ id: string; mediaType?: 'image' | 'video' }>();
+  const [broken, setBroken] = useState(false);
 
   return (
     <View style={styles.container}>
+      <StatusBar style="light" />
       {mediaType === 'video' ? (
         <FullVideo uri={id} />
       ) : (
-        <Image source={{ uri: id }} contentFit="contain" cachePolicy="memory" style={StyleSheet.absoluteFill} />
+        <Image
+          source={{ uri: id }}
+          contentFit="contain"
+          cachePolicy="memory"
+          accessibilityLabel="Photo"
+          onError={() => setBroken(true)}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+      {broken && (
+        <View style={styles.message} pointerEvents="none">
+          <Text style={styles.messageText}>{'Can’t load this photo. It may have been deleted.'}</Text>
+        </View>
       )}
       <SafeAreaView style={styles.overlay} pointerEvents="box-none">
         <Pressable
@@ -46,6 +62,16 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'flex-end',
     padding: 16,
+  },
+  message: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  messageText: {
+    color: '#ffffff',
+    textAlign: 'center',
   },
   close: {
     alignItems: 'center',
