@@ -9,7 +9,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps 
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AppState, StyleSheet, useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -64,12 +64,13 @@ export default function RootLayout() {
 function RootStack() {
   const response = useMediaPermission((state) => state.response);
   const refresh = useMediaPermission((state) => state.refresh);
+  const [refreshError, setRefreshError] = useState<unknown>(null);
 
   useEffect(() => {
-    refresh();
+    refresh().catch(setRefreshError);
     // The user may grant or revoke access in system Settings while we are backgrounded.
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') refresh();
+      if (state === 'active') refresh().catch(setRefreshError);
     });
     return () => subscription.remove();
   }, [refresh]);
@@ -78,6 +79,8 @@ function RootStack() {
     if (response) SplashScreen.hideAsync();
   }, [response]);
 
+  // Rethrown during render so the error boundary shows it; otherwise the splash screen never hides.
+  if (refreshError && !response) throw refreshError;
   if (!response) return null;
 
   const granted = hasLibraryAccess(response);
@@ -104,6 +107,11 @@ function RootStack() {
 
 // Last-resort screen for a render error anywhere below the root, instead of a blank app.
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  // The error may happen before the root stack hides the splash screen, which would cover this.
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
+
   return (
     <ThemedView style={styles.flex}>
       <View style={styles.errorContent}>
