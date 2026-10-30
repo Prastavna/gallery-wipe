@@ -13,7 +13,10 @@
     ],
     "ios": {
       "bundleIdentifier": "com.prastavna.gallerywipe",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.prastavna.gallerywipe",
