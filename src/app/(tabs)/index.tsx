@@ -15,7 +15,14 @@ import { countDeckItems, getDeckItems, type DeckItem } from '@/db/decisions';
 import { getDuplicateGroups, getSimilarGroups, type MediaGroup } from '@/db/groups';
 import { getLifetime, type Lifetime } from '@/db/trash';
 import { buildDeckQuery, NO_SESSION } from '@/features/filters/query';
-import { describeFilters, PRESETS, type FilterSpec } from '@/features/filters/spec';
+import {
+  countActiveFilters,
+  DEFAULT_FILTERS,
+  describeFilters,
+  isDefaultFilters,
+  PRESETS,
+  type FilterSpec,
+} from '@/features/filters/spec';
 import { useFilters } from '@/features/filters/store';
 import { requestScan, useIndexStatus } from '@/features/media/indexer';
 import { useMediaPermission } from '@/features/media/permissions';
@@ -75,6 +82,7 @@ export default function HomeScreen() {
   }
 
   const libraryEmpty = !stats || stats.total === 0;
+  const activeFilters = countActiveFilters(filters);
   const groupCount = groups ? groups.duplicates.length + groups.similar.length : 0;
 
   return (
@@ -106,12 +114,24 @@ export default function HomeScreen() {
                   size={16}
                   tintColor={theme.text}
                 />
-                <ThemedText type="smallBold">Filters</ThemedText>
+                <ThemedText type="smallBold">{activeFilters > 0 ? `Filters (${activeFilters})` : 'Filters'}</ThemedText>
               </Pressable>
             </View>
-            <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
-              {describeFilters(filters)}
-            </ThemedText>
+            <View style={styles.filterSummary}>
+              <ThemedText type="small" themeColor="textSecondary" numberOfLines={2} style={styles.flex}>
+                {describeFilters(filters)}
+              </ThemedText>
+              {!isDefaultFilters(filters) && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear filters"
+                  hitSlop={8}
+                  onPress={() => applyFilters(db, DEFAULT_FILTERS)}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                  <ThemedText type="smallBold">Clear</ThemedText>
+                </Pressable>
+              )}
+            </View>
             <Button
               title="Start cleaning"
               disabled={libraryEmpty || deck?.count === 0}
@@ -379,6 +399,11 @@ const styles = StyleSheet.create({
   deckLine: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.three,
+  },
+  filterSummary: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: Spacing.three,
   },
   filterButton: {

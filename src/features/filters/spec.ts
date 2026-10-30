@@ -103,10 +103,13 @@ export const SORT_LABELS: Record<SortKey, string> = {
 
 /** Fills in fields added after a spec was saved, so old sessions and settings keep working. */
 export function normalizeFilters(saved: Partial<FilterSpec> | null | undefined): FilterSpec {
-  return { ...DEFAULT_FILTERS, ...saved };
+  const spec = { ...DEFAULT_FILTERS, ...saved };
+  // Older versions could keep a video length while showing only photos, which matches nothing.
+  const photosOnly = spec.mediaType === 'image' || spec.screenshotsOnly;
+  return photosOnly && spec.minDurationMs !== null ? { ...spec, minDurationMs: null } : spec;
 }
 
-/** Short human summary, e.g. "Videos · Over 2 years old · Largest first". */
+/** Short human summary, e.g. "Videos, over 2 years old, largest first". */
 export function describeFilters(spec: FilterSpec): string {
   const parts: string[] = [];
   if (spec.screenshotsOnly) parts.push('Screenshots');
@@ -122,5 +125,31 @@ export function describeFilters(spec: FilterSpec): string {
   if (spec.review === 'kept') parts.push('Previously kept');
   if (spec.includeFavorites) parts.push('Incl. favorites');
   parts.push(spec.limit ? `${SORT_LABELS[spec.sort]}, ${spec.limit} items` : SORT_LABELS[spec.sort]);
-  return parts.join(' · ');
+  return parts.map((part, index) => (index === 0 ? part : lowerFirst(part))).join(', ');
+}
+
+// "Over 2 years old" reads "over 2 years old" mid-sentence; acronyms like "JPG" stay as they are.
+function lowerFirst(text: string) {
+  return /^[A-Z][a-z]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text;
+}
+
+/** How many filters narrow the deck; sort order doesn't count, a session size does. */
+export function countActiveFilters(spec: FilterSpec): number {
+  return [
+    spec.mediaType !== DEFAULT_FILTERS.mediaType || spec.screenshotsOnly,
+    spec.date !== DEFAULT_FILTERS.date,
+    spec.albumIds.length > 0,
+    spec.minSizeBytes !== null,
+    spec.minDurationMs !== null,
+    spec.includeFavorites !== DEFAULT_FILTERS.includeFavorites,
+    spec.orientation !== DEFAULT_FILTERS.orientation,
+    spec.extensions.length > 0,
+    spec.review !== DEFAULT_FILTERS.review,
+    spec.excludeCloud !== DEFAULT_FILTERS.excludeCloud,
+    spec.limit !== null,
+  ].filter(Boolean).length;
+}
+
+export function isDefaultFilters(spec: FilterSpec): boolean {
+  return countActiveFilters(spec) === 0 && spec.sort === DEFAULT_FILTERS.sort;
 }
