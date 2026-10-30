@@ -1,7 +1,8 @@
 export type MediaFilter = 'all' | 'image' | 'video';
 export type DatePreset = 'any' | 'thisMonth' | 'last30' | 'thisYear' | 'olderThan1y' | 'olderThan2y';
 export type Orientation = 'any' | 'portrait' | 'landscape' | 'square';
-export type ReviewState = 'unreviewed' | 'skipped' | 'kept';
+// 'any' ignores decisions entirely; used by the Library grid, not offered for decks.
+export type ReviewState = 'unreviewed' | 'skipped' | 'kept' | 'any';
 export type SortKey = 'newest' | 'oldest' | 'largest' | 'longest' | 'random' | 'album';
 
 /** Everything that decides which items a deck shows and in what order. Stored with each session. */

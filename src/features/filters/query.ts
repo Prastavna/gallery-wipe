@@ -18,6 +18,7 @@ const REVIEW_CLAUSES = {
   skipped: `(d.decision = 'skip' AND d.session_id IS NOT $sessionId)`,
   // Revisiting "keep"; once re-decided in this session the item drops out.
   kept: `(d.decision = 'keep' AND d.session_id IS NOT $sessionId)`,
+  any: '1 = 1',
 };
 
 const ALBUM_TITLE = `(SELECT MIN(al.title) FROM asset_albums aa JOIN albums al ON al.id = aa.album_id
@@ -36,7 +37,8 @@ const ORDER_BY: Record<SortKey, string> = {
 /** Translates a filter spec into SQL. Pure, so it can be tested without a device. */
 export function buildDeckQuery(spec: FilterSpec, sessionId: number, now = Date.now()): DeckQuery {
   const clauses = [REVIEW_CLAUSES[spec.review]];
-  const params: DeckQuery['params'] = { $sessionId: sessionId };
+  // Bind only parameters the SQL uses; not every SQLite driver ignores extras.
+  const params: DeckQuery['params'] = spec.review === 'any' ? {} : { $sessionId: sessionId };
 
   if (spec.mediaType !== 'all') {
     clauses.push('a.media_type = $mediaType');

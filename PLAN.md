@@ -158,9 +158,22 @@ Migrations are an append-only list in `src/db/migrations.ts`, tracked with `PRAG
 - [ ] **3. Trash + commit.** Batch delete, cancel handling. *Done when:* real deletion works on both platforms. *(Code done; on-device deletion not yet verified.)*
 - [ ] **4. Video.** Video cards, player pool, scrub, mute. *Done when:* no dropped frames moving between video cards. *(Code done; on-device frame rate and Android video posters not yet verified.)*
 - [ ] **5. Filters.** Filter/sort sheet, presets, size enrichment, sort by size. *Done when:* all filters work and the spec persists. *(Code done; every filter and sort verified against SQLite; on-device size measurement speed not yet verified.)*
-- [ ] **6. Screens.** Home stats, Library grid with multi-select delete, Summary, Settings (reset kept). *Done when:* feature-complete MVP.
+- [ ] **6. Screens.** Home stats, Library grid with multi-select delete, Summary, Settings (reset kept). *Done when:* feature-complete MVP. *(Code done; on-device grid scrolling on large libraries not yet verified.)*
 - [ ] **7. Polish.** Haptics, dark mode, accessibility labels, empty and error states (iCloud, missing files). *Done when:* TestFlight / Play internal test.
 - [ ] **8. Post-MVP.** Similar/duplicate detection, burst grouping, video compression offer, widgets.
+
+## Library and Settings
+
+- **Library tab:** a 3-column grid of the whole library, including favorites and decided items, with All/Photos/Videos and Newest/Oldest/Largest. It reuses `buildDeckQuery` with review state `any` and pages with `OFFSET` (120 per page).
+  - Badges show kept/marked status, video length, or size when sorted by size.
+  - Tap opens the viewer. Long-press or "Select" enters multi-select; the action bar deletes directly through the OS with the same confirmation rules as Trash, then shows the Summary.
+  - The grid reloads after each scan through a store subscription.
+- **Settings tab:**
+  - Reset kept, reset saved-for-later, and empty Trash without deleting (all confirm first).
+  - Library access state, with "Choose photos" (limited access) and Open Settings.
+  - Index status with Rescan. The scan timings moved here from Home.
+  - Lifetime freed, a privacy note, and the app version.
+- `confirmDeletion()` (`src/features/trash/delete-assets.ts`) is shared by Trash and Library: it is a no-op where the OS confirms itself and an in-app alert on Android 10 and older.
 
 ## Risks
 

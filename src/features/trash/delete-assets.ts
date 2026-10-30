@@ -1,6 +1,6 @@
 import { Asset } from 'expo-media-library';
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 import { recordDeleted } from '@/db/trash';
 
@@ -39,7 +39,22 @@ export async function deleteAssets(db: SQLiteDatabase, ids: string[]): Promise<D
   return { deleted, bytesFreed, stopped: false };
 }
 
-/** Android 10 and older delete immediately with no system prompt, so we must confirm ourselves. */
-export function osConfirmsDeletion() {
-  return Platform.OS === 'ios' || (typeof Platform.Version === 'number' && Platform.Version >= 30);
+/**
+ * Resolves true when deletion may proceed. iOS and Android 11+ show their own confirmation during
+ * `Asset.delete`; Android 10 and older delete immediately, so there we ask first.
+ */
+export function confirmDeletion(count: number): Promise<boolean> {
+  const osConfirms = Platform.OS === 'ios' || (typeof Platform.Version === 'number' && Platform.Version >= 30);
+  if (osConfirms) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    Alert.alert(
+      `Delete ${count} ${count === 1 ? 'item' : 'items'}?`,
+      'They will be removed from your device permanently.',
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+      ],
+      { cancelable: true, onDismiss: () => resolve(false) }
+    );
+  });
 }

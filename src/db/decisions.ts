@@ -107,3 +107,19 @@ export async function endSession(db: SQLiteDatabase, sessionId: number) {
     { $now: Date.now(), $id: sessionId }
   );
 }
+
+/** Forgets every decision of one kind, e.g. so kept items show up in decks again. */
+export async function clearDecisions(db: SQLiteDatabase, decision: Decision): Promise<number> {
+  const result = await db.runAsync('DELETE FROM decisions WHERE decision = ?', decision);
+  return result.changes;
+}
+
+export async function countDecisions(db: SQLiteDatabase): Promise<Record<Decision, number>> {
+  const rows = await db.getAllAsync<{ decision: Decision; count: number }>(
+    `SELECT d.decision, COUNT(*) AS count FROM decisions d JOIN assets a ON a.id = d.asset_id
+     GROUP BY d.decision`
+  );
+  const counts: Record<Decision, number> = { keep: 0, trash: 0, skip: 0 };
+  for (const row of rows) counts[row.decision] = row.count;
+  return counts;
+}

@@ -18,7 +18,7 @@ import { formatBytes, numberFormat } from '@/utils/format';
 
 export default function HomeScreen() {
   const db = useSQLiteContext();
-  const { scanning, scanned, lastScan, error, version } = useIndexStatus();
+  const { scanning, scanned, error, version } = useIndexStatus();
   const limited = useMediaPermission((state) => state.response?.accessPrivileges === 'limited');
   const manageLimitedAccess = useMediaPermission((state) => state.manageLimitedAccess);
   const [stats, setStats] = useState<LibraryStats | null>(null);
@@ -125,15 +125,16 @@ export default function HomeScreen() {
             <Stat label="Marked to delete" value={stats?.pendingTrash} />
           </ThemedView>
 
-          <ThemedText type="small" themeColor="textSecondary">
-            {scanning
-              ? `Indexing library… ${numberFormat.format(scanned)} items`
-              : error
-                ? `Indexing failed: ${error}`
-                : lastScan
-                  ? `Indexed ${numberFormat.format(lastScan.count)} items in ${formatSeconds(lastScan.assetsMs)} (albums ${formatSeconds(lastScan.durationMs - lastScan.assetsMs)})`
-                  : null}
-          </ThemedText>
+          {scanning && (
+            <ThemedText type="small" themeColor="textSecondary">
+              {`Indexing library… ${numberFormat.format(scanned)} items`}
+            </ThemedText>
+          )}
+          {!!error && (
+            <ThemedText type="small" themeColor="textSecondary">
+              {`Indexing failed: ${error}. Try Rescan in Settings.`}
+            </ThemedText>
+          )}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -151,9 +152,6 @@ function Stat({ label, value }: { label: string; value: number | undefined }) {
   );
 }
 
-function formatSeconds(ms: number) {
-  return `${(ms / 1000).toFixed(1)} s`;
-}
 
 const styles = StyleSheet.create({
   container: {

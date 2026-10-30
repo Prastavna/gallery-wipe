@@ -5,7 +5,6 @@ import { SymbolView } from 'expo-symbols';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Platform,
   Pressable,
@@ -22,7 +21,7 @@ import { Spacing } from '@/constants/theme';
 import { getTrashItems, restoreFromTrash, type TrashItem } from '@/db/trash';
 import { requestScan } from '@/features/media/indexer';
 import { fillMissingSizes } from '@/features/media/sizes';
-import { deleteAssets, osConfirmsDeletion } from '@/features/trash/delete-assets';
+import { confirmDeletion, deleteAssets } from '@/features/trash/delete-assets';
 import { useTheme } from '@/hooks/use-theme';
 import { formatBytes, numberFormat } from '@/utils/format';
 
@@ -79,8 +78,8 @@ export default function TrashScreen() {
     setSelected(new Set());
   }
 
-  async function runDelete() {
-    if (!items) return;
+  async function onDelete() {
+    if (!items || !(await confirmDeletion(items.length))) return;
     setDeleting(true);
     setNotice(null);
     const result = await deleteAssets(db, items.map((item) => item.id));
@@ -99,21 +98,6 @@ export default function TrashScreen() {
         remaining: String(items.length - result.deleted),
       },
     });
-  }
-
-  function onDelete() {
-    if (osConfirmsDeletion()) {
-      runDelete();
-      return;
-    }
-    Alert.alert(
-      `Delete ${numberFormat.format(items?.length ?? 0)} items?`,
-      'They will be removed from your device permanently.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: runDelete },
-      ]
-    );
   }
 
   return (
