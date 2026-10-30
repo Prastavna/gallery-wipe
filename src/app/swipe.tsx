@@ -13,7 +13,7 @@ import type { Decision, DeckItem } from '@/db/decisions';
 import type { SwipeCardHandle } from '@/features/deck/swipe-card';
 import { SwipeDeck } from '@/features/deck/swipe-deck';
 import { useDeck } from '@/features/deck/use-deck';
-import { describeFilters } from '@/features/filters/spec';
+import { describeFilters, type FilterSpec } from '@/features/filters/spec';
 import { useFilters } from '@/features/filters/store';
 import { requestScan } from '@/features/media/indexer';
 import { haptic } from '@/features/preferences';
@@ -31,9 +31,15 @@ const ANNOUNCEMENTS: Record<Decision, string> = {
 };
 
 export default function SwipeScreen() {
+  const spec = useFilters((state) => state.spec);
+  // A deck keeps its filters for the whole session, so applying new ones starts a fresh session.
+  return <SwipeSession key={JSON.stringify(spec)} spec={spec} />;
+}
+
+function SwipeSession({ spec }: { spec: FilterSpec }) {
   const db = useSQLiteContext();
   const theme = useTheme();
-  const deck = useDeck(useFilters((state) => state.spec));
+  const deck = useDeck(spec);
   const topCard = useRef<SwipeCardHandle>(null);
   const focused = useIsFocused();
   const { prune } = deck;
@@ -83,14 +89,31 @@ export default function SwipeScreen() {
             name={{ ios: 'xmark', android: 'close' }}
             onPress={() => router.back()}
           />
-          <View style={styles.headerTitle}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Filters: ${describeFilters(deck.spec)}`}
+            accessibilityHint="Changing filters starts a new deck."
+            onPress={() => router.push('/filters')}
+            style={({ pressed }) => [styles.headerTitle, { opacity: pressed ? 0.6 : 1 }]}>
             <ThemedText type="heading">
               {deck.status === 'ready' ? `${numberFormat.format(deck.remaining)} left` : ' '}
             </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-              {describeFilters(deck.spec)}
-            </ThemedText>
-          </View>
+            <View style={styles.filterLine}>
+              <SymbolView
+                name={{ ios: 'line.3.horizontal.decrease', android: 'filter_list' }}
+                size={14}
+                tintColor={theme.textSecondary}
+              />
+              <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.filterText}>
+                {describeFilters(deck.spec)}
+              </ThemedText>
+              <SymbolView
+                name={{ ios: 'chevron.down', android: 'expand_more' }}
+                size={12}
+                tintColor={theme.textSecondary}
+              />
+            </View>
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Review ${deck.counts.trash} marked to delete`}
@@ -116,7 +139,7 @@ export default function SwipeScreen() {
               <ThemedText themeColor="textSecondary" style={styles.centerText}>
                 {`No items fit “${describeFilters(deck.spec)}”.`}
               </ThemedText>
-              <Button title="Change filters" onPress={() => router.replace('/filters')} style={styles.doneButton} />
+              <Button title="Change filters" onPress={() => router.push('/filters')} style={styles.doneButton} />
             </View>
           ) : deck.status === 'done' ? (
             <View style={[styles.fill, styles.done]}>
@@ -225,6 +248,15 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: Spacing.two,
+  },
+  filterLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    maxWidth: '100%',
+  },
+  filterText: {
+    flexShrink: 1,
   },
   pill: {
     flexDirection: 'row',
