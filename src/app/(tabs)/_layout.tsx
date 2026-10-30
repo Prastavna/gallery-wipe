@@ -1,9 +1,12 @@
 import { NativeTabs } from 'expo-router/native-tabs';
 
+import { useLibrarySync } from '@/features/media/use-library-sync';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function TabsLayout() {
   const colors = useTheme();
+  // Mounted only once library access is granted (see the root layout's route guard).
+  useLibrarySync();
 
   return (
     <NativeTabs

@@ -60,24 +60,29 @@ src/
 
 ### Data model (SQLite)
 
-**`assets`** has these columns:
-- `id`, `mediaType`, `width`, `height`, `duration`
-- `creationTime`, `modificationTime`, `isFavorite`, `albumIds`
-- `isScreenshot`, `filename`, `ext`
-- `size` (nullable, filled lazily), `inCloud`, `lastSeenAt`
+All times are epoch **milliseconds** and durations are milliseconds. That is what `expo-media-library` returns natively on both platforms, even though its type docs say seconds.
 
-Indexes: `(creationTime)`, `(size)`, `(mediaType, creationTime)`.
+**`assets`** has these columns:
+- `id`, `media_type`, `filename`, `ext`, `width`, `height`, `duration`
+- `creation_time`, `modification_time`, `is_favorite`, `is_screenshot`, `subtypes` (iOS)
+- `size`, `in_cloud`, `enriched_at` (filled lazily; cleared when `modification_time` changes)
+- `scan_id`
+
+Indexes: `(creation_time)`, `(media_type, creation_time)`, `(size)`.
 
 The other tables:
-- **`decisions`**: `assetId` (PK), `decision` (`keep` | `trash` | `skip`), `decidedAt`, `sessionId`, `committed`.
-- **`sessions`**: `id`, `filterSnapshot`, `startedAt`, counts, `bytesFreed`.
-- **`settings`**: key/value.
+- **`albums`** (`id`, `title`, `scan_id`) and **`asset_albums`** (join table). On iOS an asset can be in several albums.
+- **`decisions`**: `asset_id` (PK), `decision` (`keep` | `trash` | `skip`), `decided_at`, `session_id`. There is deliberately no foreign key to `assets`: a partial scan must never wipe "keep" history. Rows for deleted assets are removed on commit.
+- **`sessions`**: `id`, `filter_spec`, `started_at`, `ended_at`, counts, `bytes_freed`.
+- **`settings`**: key/JSON value.
+
+Migrations are an append-only list in `src/db/migrations.ts`, tracked with `PRAGMA user_version`.
 
 ### Indexer
 
-1. **Fast pass.** `Query().exeForMetadata()` in pages of ~500, upserted into `assets`. The deck can start after the first page.
+1. **Fast pass.** `Query().exeForMetadata()` in pages of 500. Each page is upserted with a single SQL statement (the page as JSON through `json_each`). The scan is mark-and-sweep: rows not stamped with the current `scan_id` are deleted, but only after the scan completes. Then an album pass runs (`Album.getAlbumsMetadata()` + `Query().album()`), which also marks Android screenshots by folder name.
 2. **Enrichment.** Resolve URI, then read size and subtypes, in small concurrent batches while idle. It pauses while the deck animates and shows progress.
-3. **Incremental sync.** `MediaLibrary.addListener`: iOS provides inserted/deleted IDs. Android gives no details, so diff on `modificationTime` on each event and on app foreground.
+3. **Sync.** A full metadata scan runs on mount, on app foreground, and on `addListener` change events (debounced 1 s). Concurrent requests coalesce into one follow-up scan. Android events carry no details, and a full metadata scan is cheap enough that iOS uses the same path.
 4. **Querying.** Once indexed, all filtering and sorting runs in SQLite.
 
 ## Filters and sort
@@ -137,7 +142,7 @@ A single serializable `FilterSpec` maps to SQL `WHERE`/`ORDER BY`. It is stored 
 ## Milestones
 
 - [ ] **0. Setup.** Remove template screens, drop web, install libraries, config plugins, `eas.json` dev/preview/production profiles. *Done when:* dev build runs on device. *(Code done; on-device dev build not yet verified.)*
-- [ ] **1. Index.** Permissions, SQLite schema/migrations, indexer fast pass. *Done when:* 10k+ assets indexed in under 3 s.
+- [ ] **1. Index.** Permissions, SQLite schema/migrations, indexer fast pass. *Done when:* 10k+ assets indexed in under 3 s. *(Code done; on-device timing not yet verified. Home shows the asset-pass time.)*
 - [ ] **2. Photo deck.** keep/trash/skip, undo, persisted decisions. *Done when:* smooth on a mid-range Android.
 - [ ] **3. Trash + commit.** Batch delete, cancel handling. *Done when:* real deletion works on both platforms.
 - [ ] **4. Video.** Video cards, player pool, scrub, mute. *Done when:* no dropped frames moving between video cards.
