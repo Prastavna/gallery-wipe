@@ -53,9 +53,12 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.flex}>
       <ThemeProvider value={NAVIGATION_THEMES[colorScheme === 'dark' ? 'dark' : 'light']}>
         <StatusBar style="auto" />
-        <SQLiteProvider databaseName="gallery-wipe.db" onInit={migrateDbIfNeeded}>
-          {fontsReady && <RootStack />}
-        </SQLiteProvider>
+        {/* Gate outside the provider: SQLiteProvider's memo ignores `children`, so it would never show RootStack. */}
+        {fontsReady && (
+          <SQLiteProvider databaseName="gallery-wipe.db" onInit={migrateDbIfNeeded}>
+            <RootStack />
+          </SQLiteProvider>
+        )}
       </ThemeProvider>
     </GestureHandlerRootView>
   );
