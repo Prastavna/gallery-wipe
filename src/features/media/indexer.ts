@@ -35,7 +35,8 @@ type IndexState = {
   scanned: number;
   lastScan: ScanSummary | null;
   error: string | null;
-  // Bumped after every successful scan so screens know to re-query.
+  // Bumped whenever the index has new rows worth showing (first page, end of the asset pass, end
+  // of the scan) so screens know to re-query; on a fresh install the deck can fill in mid-scan.
   version: number;
 };
 
@@ -94,12 +95,18 @@ async function scanLibrary(db: SQLiteDatabase) {
         .exeForMetadata();
 
       await db.withTransactionAsync(() => upsertAssets(db, page.map(toAssetRow), scanId));
+      const first = offset === 0;
       offset += page.length;
-      useIndexStatus.setState({ scanned: offset });
+      useIndexStatus.setState((state) => ({
+        scanned: offset,
+        version: first ? state.version + 1 : state.version,
+      }));
       if (page.length < PAGE_SIZE) break;
     }
 
     const assetsMs = Date.now() - startedAt;
+    // Albums take a while on big libraries; let screens show every asset before they are done.
+    if (offset > PAGE_SIZE) useIndexStatus.setState((state) => ({ version: state.version + 1 }));
     await indexAlbums(db, scanId);
     await db.withTransactionAsync(async () => {
       if (Platform.OS === 'android') await markScreenshotsFromAlbums(db);
